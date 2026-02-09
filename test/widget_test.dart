@@ -12,7 +12,6 @@ void main() {
     await tester.pumpWidget(const CropAIdApp());
 
     // Verify that our app starts without errors
-    // The app should show the loading screen initially
     expect(find.byType(CropAIdApp), findsOneWidget);
   });
 }

@@ -1,9 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'preferences_service.dart';
 
 /// Service for managing audio feedback
-/// Equivalent to React's audioService.js
 class AudioService {
   final FlutterTts _tts = FlutterTts();
   final AudioPlayer _audioPlayer = AudioPlayer();
@@ -17,11 +17,10 @@ class AudioService {
   Future<void> init() async {
     if (_isInitialized) return;
 
-    // Load preferences
     _soundEnabled = await preferencesService.isSoundEnabled();
     _voiceEnabled = await preferencesService.isVoiceEnabled();
 
-    // Configure TTS
+    // Default configuration
     await _tts.setLanguage(_currentLanguage);
     await _tts.setSpeechRate(0.5);
     await _tts.setVolume(1.0);
@@ -48,69 +47,65 @@ class AudioService {
     await preferencesService.setVoiceEnabled(enabled);
   }
 
-  /// Get sound enabled status
   bool get isSoundEnabled => _soundEnabled;
-
-  /// Get voice enabled status
   bool get isVoiceEnabled => _voiceEnabled;
 
   /// Speak text
   Future<void> speak(String text) async {
     if (!_voiceEnabled || text.isEmpty) return;
-    
     await _tts.stop();
     await _tts.speak(text);
   }
 
-  /// Stop speaking
-  Future<void> stopSpeaking() async {
-    await _tts.stop();
+  /// Speak with localized guidance
+  Future<void> speakGuidance(String part) async {
+    // US2: Voice guidance for registration
+    // In a real app, these would come from localization files
+    Map<String, String> prompts = {
+      'welcome': 'Welcome to Crop AId. Let\'s get you registered.',
+      'phone': 'Please enter your ten digit mobile number.',
+      'otp': 'Please enter the six digit code sent to your phone.',
+      'name': 'What is your full name?',
+      'success': 'Registration successful. Welcome to the community.',
+    };
+    
+    final prompt = prompts[part];
+    if (prompt != null) {
+      await speak(prompt);
+    }
   }
 
-  /// Play click sound
-  Future<void> playClick() async {
+  /// Play sound effects
+  Future<void> playSound(String type) async {
     if (!_soundEnabled) return;
-    // TODO: Add actual click sound asset
-    // await _audioPlayer.play(AssetSource('sounds/click.mp3'));
-  }
 
-  /// Play success sound
-  Future<void> playSuccess() async {
-    if (!_soundEnabled) return;
-    // TODO: Add actual success sound asset
-    // await _audioPlayer.play(AssetSource('sounds/success.mp3'));
-  }
-
-  /// Play error sound
-  Future<void> playError() async {
-    if (!_soundEnabled) return;
-    // TODO: Add actual error sound asset
-    // await _audioPlayer.play(AssetSource('sounds/error.mp3'));
-  }
-
-  /// Confirm action with sound and optional voice
-  Future<void> confirmAction(String type, {String? message}) async {
+    // Mapping types to placeholder sound URLs (using some generic beep sounds)
+    String url = '';
     switch (type) {
       case 'success':
-        await playSuccess();
+        url = 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3';
         break;
       case 'error':
-        await playError();
+        url = 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3';
         break;
+      case 'click':
       default:
-        await playClick();
+        url = 'https://assets.mixkit.co/active_storage/sfx/2567/2567-preview.mp3';
     }
 
+    try {
+      await _audioPlayer.play(UrlSource(url));
+    } catch (e) {
+      debugPrint('Error playing sound: $e');
+    }
+  }
+
+  /// Confirm action with sound and message
+  Future<void> confirmAction(String type, {String? message}) async {
+    await playSound(type);
     if (message != null) {
       await speak(message);
     }
-  }
-
-  /// Speak localized message
-  Future<void> speakLocalized(String key, String langCode) async {
-    // Set language and speak
-    await setLanguage('$langCode-IN');
-    // TODO: Get localized string and speak
   }
 
   /// Dispose resources
@@ -120,5 +115,4 @@ class AudioService {
   }
 }
 
-/// Global singleton instance
 final audioService = AudioService();

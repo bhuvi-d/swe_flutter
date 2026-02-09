@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../core/theme/app_colors.dart';
 import '../core/localization/translation_service.dart';
-import '../core/localization/language_provider.dart';
 import '../services/crop_advice_service.dart';
 import '../widgets/crop_advice_card.dart';
+import '../models/analysis_result.dart';
 
 /// LLM Advice View - Get AI advice for crop diseases
 /// Matches React's CropAdviceDemo component
@@ -27,7 +26,6 @@ class _LlmAdviceViewState extends State<LlmAdviceView> {
   double _confidence = 0.93;
   bool _isLoading = false;
   String? _error;
-  Map<String, dynamic>? _advice;
 
   @override
   void dispose() {
@@ -53,7 +51,6 @@ class _LlmAdviceViewState extends State<LlmAdviceView> {
       if (!mounted) return;
 
       setState(() {
-        _advice = result;
         _isLoading = false;
       });
 
@@ -135,7 +132,7 @@ class _LlmAdviceViewState extends State<LlmAdviceView> {
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.nature500.withOpacity(0.4),
+                            color: AppColors.nature500.withValues(alpha: 0.4),
                             blurRadius: 15,
                             offset: const Offset(0, 6),
                           ),
@@ -169,7 +166,7 @@ class _LlmAdviceViewState extends State<LlmAdviceView> {
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
+                      color: Colors.black.withValues(alpha: 0.08),
                       blurRadius: 20,
                       offset: const Offset(0, 8),
                     ),

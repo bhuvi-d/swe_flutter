@@ -1,17 +1,25 @@
-import 'package:flutter/material.dart';
+// Imports
 import 'dart:async';
+import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:video_player/video_player.dart';
 import '../core/theme/app_colors.dart';
+import '../core/localization/translation_service.dart';
+import '../services/audio_service.dart';
 
-/// Video Recorder View - Record video for plant diagnosis
-/// Matches React's VideoRecorder component
+/// Video Recorder View - Record short videos for diagnosis
+/// US13: Record short videos with duration limits
+/// US16: Confirmation of captured input
 class VideoRecorderView extends StatefulWidget {
   final VoidCallback onBack;
-  final Function(String videoPath) onCapture;
+  final Function(String videoPath) onVideoRecorded;
 
   const VideoRecorderView({
     super.key,
     required this.onBack,
-    required this.onCapture,
+    required this.onVideoRecorded,
   });
 
   @override
@@ -19,278 +27,383 @@ class VideoRecorderView extends StatefulWidget {
 }
 
 class _VideoRecorderViewState extends State<VideoRecorderView> {
+  final ImagePicker _picker = ImagePicker();
   bool _isRecording = false;
-  bool _isFlashOn = false;
-  bool _isFrontCamera = false;
-  int _recordDuration = 0;
-  Timer? _timer;
+  bool _hasVideo = false;
+  XFile? _recordedVideo;
+  int _recordingDuration = 0;
+  Timer? _durationTimer;
+  VideoPlayerController? _videoController;
+  
+  // US13: Duration limit (30 seconds)
+  static const int maxDurationSeconds = 30;
+
+  @override
+  void initState() {
+    super.initState();
+    audioService.speak('Record a short video showing your plant symptoms.');
+  }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _durationTimer?.cancel();
+    _videoController?.dispose();
     super.dispose();
   }
 
-  void _toggleFlash() {
-    setState(() {
-      _isFlashOn = !_isFlashOn;
-    });
-  }
+  /// US13: Record or select video
+  Future<void> _startRecording() async {
+    if (_isRecording) return;
 
-  void _switchCamera() {
     setState(() {
-      _isFrontCamera = !_isFrontCamera;
+      _isRecording = true;
+      _recordingDuration = 0;
     });
-  }
 
-  void _toggleRecording() {
-    if (_isRecording) {
+    // Start duration timer for UI feedback
+    _durationTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() => _recordingDuration++);
+      if (_recordingDuration >= maxDurationSeconds) {
+        _stopRecording();
+      }
+    });
+
+    try {
+      final XFile? video = await _picker.pickVideo(
+        source: kIsWeb ? ImageSource.gallery : ImageSource.camera,
+        preferredCameraDevice: CameraDevice.rear,
+        maxDuration: const Duration(seconds: maxDurationSeconds),
+      );
+
+      _durationTimer?.cancel();
+
+      if (video != null) {
+        await _initializeVideoPlayer(video);
+        setState(() {
+          _isRecording = false;
+          _hasVideo = true;
+          _recordedVideo = video;
+        });
+        
+        // US16: Confirmation
+        audioService.confirmAction('success', message: 'Video recorded successfully');
+      } else {
+        _stopRecording(); // Reset state if cancelled
+      }
+    } catch (e) {
       _stopRecording();
-    } else {
-      _startRecording();
+      debugPrint('Error recording video: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
     }
   }
 
-  void _startRecording() {
-    setState(() {
-      _isRecording = true;
-      _recordDuration = 0;
-    });
+  Future<void> _initializeVideoPlayer(XFile video) async {
+    _videoController?.dispose();
+    
+    if (kIsWeb) {
+      _videoController = VideoPlayerController.networkUrl(Uri.parse(video.path));
+    } else {
+      _videoController = VideoPlayerController.file(File(video.path));
+    }
 
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() {
-        _recordDuration++;
-      });
-    });
+    try {
+      await _videoController!.initialize();
+      await _videoController!.setLooping(true);
+      await _videoController!.play();
+      setState(() {});
+    } catch (e) {
+      debugPrint('Error initializing video player: $e');
+    }
   }
 
   void _stopRecording() {
-    _timer?.cancel();
+    _durationTimer?.cancel();
     setState(() {
       _isRecording = false;
-    });
-    
-    // Simulate processing delay
-    Future.delayed(const Duration(milliseconds: 500), () {
-      widget.onCapture('captured_video.mp4');
     });
   }
 
   String _formatDuration(int seconds) {
-    final int minutes = seconds ~/ 60;
-    final int remainingSeconds = seconds % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
+    final mins = seconds ~/ 60;
+    final secs = seconds % 60;
+    return '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+  }
+
+  void _retakeVideo() {
+    _videoController?.pause();
+    _videoController?.dispose();
+    _videoController = null;
+    setState(() {
+      _hasVideo = false;
+      _recordedVideo = null;
+      _recordingDuration = 0;
+    });
+  }
+
+  /// US13 & US16: Submit video
+  Future<void> _submitVideo() async {
+    if (_recordedVideo == null) return;
+    
+    // US13: Check file size (approx limit for 30s video)
+    final int sizeInBytes = await _recordedVideo!.length();
+    final double sizeInMb = sizeInBytes / (1024 * 1024);
+    
+    if (sizeInMb > 50) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Video is too large (>50MB). Please record a shorter video.'),
+          backgroundColor: AppColors.red600,
+        ),
+      );
+      return;
+    }
+    
+    if (!mounted) return;
+
+    // US16: Final confirmation
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: const [
+            Icon(Icons.check_circle, color: Colors.white),
+            SizedBox(width: 12),
+            Text('Video ready for analysis!'),
+          ],
+        ),
+        backgroundColor: AppColors.nature600,
+      ),
+    );
+
+    widget.onVideoRecorded(_recordedVideo!.path);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          // Camera Preview (placeholder)
-          Container(
-            width: double.infinity,
-            height: double.infinity,
-            color: AppColors.gray900,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.videocam,
-                  size: 100,
-                  color: AppColors.gray500,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Video Preview',
-                  style: TextStyle(
-                    color: AppColors.gray400,
-                    fontSize: 18,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Record 360° view of the plant',
-                  style: TextStyle(
-                    color: AppColors.gray500,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: widget.onBack,
+        ),
+        title: Text(
+          context.t('videoView.title'),
+          style: const TextStyle(color: Colors.white),
+        ),
+        centerTitle: true,
+      ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.black,
+              AppColors.nature900.withOpacity(0.8),
+            ],
           ),
-
-          // Top Controls
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Back Button
-                    _buildControlButton(
-                      icon: Icons.close,
-                      onTap: widget.onBack,
-                    ),
-                    
-                    // Timer Display (only visible when recording)
-                    if (_isRecording)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: AppColors.red600,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: const BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              _formatDuration(_recordDuration),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                    // Flash Toggle
-                    _buildControlButton(
-                      icon: _isFlashOn ? Icons.flash_on : Icons.flash_off,
-                      onTap: _toggleFlash,
-                    ),
-                  ],
-                ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Video Preview Area
+              Expanded(
+                child: _buildPreviewArea(),
               ),
-            ),
+
+              // Controls
+              _buildControls(),
+            ],
           ),
-
-          // Recording Instructions Overlay
-          if (!_isRecording)
-            Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.6),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Text(
-                  'Tap red button to start recording',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-            ),
-
-          // Bottom Controls
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: SafeArea(
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 32),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [
-                      Colors.black.withOpacity(0.8),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    // Gallery Button (placeholder)
-                    _buildControlButton(
-                      icon: Icons.video_library,
-                      onTap: () {},
-                      size: 50,
-                    ),
-                    
-                    // Record Button
-                    GestureDetector(
-                      onTap: _toggleRecording,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white,
-                            width: 4,
-                          ),
-                        ),
-                        child: Container(
-                          margin: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: _isRecording ? AppColors.red600 : Colors.white,
-                          ),
-                          child: Icon(
-                            _isRecording ? Icons.stop : Icons.circle,
-                            color: _isRecording ? Colors.white : AppColors.red600,
-                            size: _isRecording ? 32 : 0, // Solid circle when idle
-                          ),
-                        ),
-                      ),
-                    ),
-                    
-                    // Switch Camera Button
-                    _buildControlButton(
-                      icon: Icons.flip_camera_ios,
-                      onTap: _switchCamera,
-                      size: 50,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildControlButton({
-    required IconData icon,
-    required VoidCallback onTap,
-    double size = 40,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
+  Widget _buildPreviewArea() {
+    return Center(
       child: Container(
-        width: size,
-        height: size,
+        width: 320,
+        height: 400,
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.5),
-          shape: BoxShape.circle,
+          color: AppColors.gray900,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: _isRecording ? AppColors.red500 : AppColors.nature500,
+            width: 3,
+          ),
         ),
-        child: Icon(
-          icon,
-          color: Colors.white,
-          size: size * 0.5,
+        child: Stack(
+          children: [
+            // Center content
+            Center(
+              child: _hasVideo && _videoController != null && _videoController!.value.isInitialized
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: AspectRatio(
+                        aspectRatio: _videoController!.value.aspectRatio,
+                        child: VideoPlayer(_videoController!),
+                      ),
+                    )
+                  : Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          _hasVideo ? Icons.check_circle : Icons.videocam,
+                          size: 64,
+                          color: _hasVideo ? AppColors.nature500 : AppColors.gray500,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          _hasVideo
+                              ? 'Loading Preview...'
+                              : (kIsWeb ? 'Tap to select video' : 'Tap to record'),
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.8),
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+            
+            // Recording indicator
+            if (_isRecording)
+              Positioned(
+                top: 16,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.red600,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 12,
+                          height: 12,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${_formatDuration(_recordingDuration)} / ${_formatDuration(maxDurationSeconds)}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+            // Duration limit info
+            Positioned(
+              bottom: 16,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Text(
+                  'Max: ${maxDurationSeconds}s',
+                  style: TextStyle(
+                    color: AppColors.gray400,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildControls() {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        children: [
+          if (!_hasVideo) ...[
+            // Record button
+            GestureDetector(
+              onTap: _isRecording ? _stopRecording : _startRecording,
+              child: Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _isRecording ? AppColors.red600 : AppColors.nature600,
+                  boxShadow: [
+                    BoxShadow(
+                      color: (_isRecording ? AppColors.red600 : AppColors.nature600).withOpacity(0.4),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Icon(
+                    _isRecording ? Icons.stop : Icons.videocam,
+                    size: 36,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ] else ...[
+            // Preview actions
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Retake button
+                ElevatedButton.icon(
+                  onPressed: _retakeVideo,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Retake'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.gray700,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                  ),
+                ),
+                const SizedBox(width: 20),
+                // Submit button
+                ElevatedButton.icon(
+                  onPressed: _submitVideo,
+                  icon: const Icon(Icons.check),
+                  label: const Text('Use Video'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.nature600,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 16),
+          Text(
+            _isRecording
+                ? 'Recording...'
+                : (_hasVideo ? 'Review your video' : 'Tap to ${kIsWeb ? "select" : "record"} video'),
+            style: TextStyle(color: AppColors.gray400),
+          ),
+        ],
       ),
     );
   }

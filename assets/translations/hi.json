@@ -309,6 +309,21 @@
         "title": "सेटिंग्स",
         "language": "भाषा"
     },
+    "settingsView": {
+        "general": "सामान्य",
+        "darkMode": "डार्क मोड",
+        "notifications": "सूचनाएं",
+        "pushNotifications": "पुश सूचनाएं",
+        "pestAlerts": "कीट अलर्ट",
+        "audio": "ऑडियो",
+        "soundEffects": "ध्वनि प्रभाव",
+        "voiceSettings": "वॉइस सेटिंग्स",
+        "aboutSection": "के बारे में",
+        "appVersion": "ऐप संस्करण",
+        "termsOfService": "सेवा की शर्तें",
+        "privacyPolicy": "गोपनीयता नीति",
+        "clearData": "ऐप डेटा साफ़ करें"
+    },
     "userProfile": {
         "title": "मेरी प्रोफ़ाइल",
         "scans": "स्कैन",
@@ -326,5 +341,20 @@
         "logout": "लॉगआउट",
         "verifiedFarmer": "सत्यापित किसान",
         "farmer": "किसान"
+    },
+    "llmAdvice": {
+        "title": "AI फसल डॉक्टर",
+        "subtitle": "फसल रोगों के लिए तुरंत AI-संचालित सलाह प्राप्त करें",
+        "diseaseInfo": "रोग जानकारी",
+        "cropName": "फसल का नाम",
+        "cropHint": "जैसे, टमाटर, आलू, गेहूं",
+        "diseaseDetected": "पहचाना गया रोग",
+        "diseaseHint": "जैसे, प्रारंभिक झुलसा, पाउडरी मिल्ड्यू",
+        "severity": "गंभीरता",
+        "confidence": "विश्वास",
+        "getAdvice": "AI सलाह प्राप्त करें",
+        "generating": "सलाह तैयार हो रही है...",
+        "howToUse": "कैसे उपयोग करें",
+        "instructions": "फसल का नाम और पहचाना गया रोग दर्ज करें, फिर गंभीरता और विश्वास स्तर चुनें। हमारा AI कारण, लक्षण, उपचार और रोकथाम युक्तियों सहित किसान-अनुकूल सलाह तैयार करेगा।"
     }
 }

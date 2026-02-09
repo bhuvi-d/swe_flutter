@@ -309,6 +309,21 @@
         "title": "Settings",
         "language": "Language"
     },
+    "settingsView": {
+        "general": "General",
+        "darkMode": "Dark Mode",
+        "notifications": "Notifications",
+        "pushNotifications": "Push Notifications",
+        "pestAlerts": "Pest Alerts",
+        "audio": "Audio",
+        "soundEffects": "Sound Effects",
+        "voiceSettings": "Voice Settings",
+        "aboutSection": "About",
+        "appVersion": "App Version",
+        "termsOfService": "Terms of Service",
+        "privacyPolicy": "Privacy Policy",
+        "clearData": "Clear App Data"
+    },
     "userProfile": {
         "title": "My Profile",
         "scans": "Scans",

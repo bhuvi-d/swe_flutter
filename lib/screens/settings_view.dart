@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../core/theme/app_colors.dart';
+import '../core/localization/translation_service.dart';
+import '../core/providers/language_provider.dart';
 
 /// Settings View - App settings
-/// Matches React's settings components
+/// Matches React's SettingsPanel component with localization
 class SettingsView extends StatefulWidget {
   final VoidCallback onBack;
   final VoidCallback? onLanguageChange;
@@ -25,6 +28,9 @@ class _SettingsViewState extends State<SettingsView> {
 
   @override
   Widget build(BuildContext context) {
+    final languageProvider = Provider.of<LanguageProvider>(context);
+    final currentLang = languageProvider.currentLanguageInfo;
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -34,9 +40,9 @@ class _SettingsViewState extends State<SettingsView> {
           onPressed: widget.onBack,
           color: AppColors.gray700,
         ),
-        title: const Text(
-          'Settings',
-          style: TextStyle(color: AppColors.gray800),
+        title: Text(
+          context.t('settings.title'),
+          style: const TextStyle(color: AppColors.gray800),
         ),
         centerTitle: true,
       ),
@@ -54,17 +60,17 @@ class _SettingsViewState extends State<SettingsView> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // General Section
-              _buildSectionTitle('General'),
+              _buildSectionTitle(context.t('settingsView.general')),
               const SizedBox(height: 12),
               _buildSettingsCard([
                 _buildSettingsItem(
                   icon: Icons.language,
-                  title: 'Language',
+                  title: context.t('settings.language'),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'English',
+                        currentLang.nativeName,
                         style: TextStyle(color: AppColors.gray500),
                       ),
                       const SizedBox(width: 8),
@@ -76,7 +82,7 @@ class _SettingsViewState extends State<SettingsView> {
                 _buildDivider(),
                 _buildSwitchItem(
                   icon: Icons.dark_mode,
-                  title: 'Dark Mode',
+                  title: context.t('settingsView.darkMode'),
                   value: _darkMode,
                   onChanged: (val) => setState(() => _darkMode = val),
                 ),
@@ -85,19 +91,19 @@ class _SettingsViewState extends State<SettingsView> {
               const SizedBox(height: 24),
 
               // Notifications Section
-              _buildSectionTitle('Notifications'),
+              _buildSectionTitle(context.t('settingsView.notifications')),
               const SizedBox(height: 12),
               _buildSettingsCard([
                 _buildSwitchItem(
                   icon: Icons.notifications,
-                  title: 'Push Notifications',
+                  title: context.t('settingsView.pushNotifications'),
                   value: _pushNotifications,
                   onChanged: (val) => setState(() => _pushNotifications = val),
                 ),
                 _buildDivider(),
                 _buildSwitchItem(
                   icon: Icons.warning_amber,
-                  title: 'Pest Alerts',
+                  title: context.t('settingsView.pestAlerts'),
                   value: _pestAlerts,
                   onChanged: (val) => setState(() => _pestAlerts = val),
                 ),
@@ -106,19 +112,19 @@ class _SettingsViewState extends State<SettingsView> {
               const SizedBox(height: 24),
 
               // Audio Section
-              _buildSectionTitle('Audio'),
+              _buildSectionTitle(context.t('settingsView.audio')),
               const SizedBox(height: 12),
               _buildSettingsCard([
                 _buildSwitchItem(
                   icon: Icons.volume_up,
-                  title: 'Sound Effects',
+                  title: context.t('settingsView.soundEffects'),
                   value: _soundEnabled,
                   onChanged: (val) => setState(() => _soundEnabled = val),
                 ),
                 _buildDivider(),
                 _buildSettingsItem(
                   icon: Icons.record_voice_over,
-                  title: 'Voice Settings',
+                  title: context.t('settingsView.voiceSettings'),
                   trailing: Icon(Icons.chevron_right, color: AppColors.gray400),
                   onTap: () {},
                 ),
@@ -127,12 +133,12 @@ class _SettingsViewState extends State<SettingsView> {
               const SizedBox(height: 24),
 
               // About Section
-              _buildSectionTitle('About'),
+              _buildSectionTitle(context.t('settingsView.aboutSection')),
               const SizedBox(height: 12),
               _buildSettingsCard([
                 _buildSettingsItem(
                   icon: Icons.info_outline,
-                  title: 'App Version',
+                  title: context.t('settingsView.appVersion'),
                   trailing: Text(
                     '1.0.0',
                     style: TextStyle(color: AppColors.gray500),
@@ -141,14 +147,14 @@ class _SettingsViewState extends State<SettingsView> {
                 _buildDivider(),
                 _buildSettingsItem(
                   icon: Icons.description,
-                  title: 'Terms of Service',
+                  title: context.t('settingsView.termsOfService'),
                   trailing: Icon(Icons.chevron_right, color: AppColors.gray400),
                   onTap: () {},
                 ),
                 _buildDivider(),
                 _buildSettingsItem(
                   icon: Icons.privacy_tip,
-                  title: 'Privacy Policy',
+                  title: context.t('settingsView.privacyPolicy'),
                   trailing: Icon(Icons.chevron_right, color: AppColors.gray400),
                   onTap: () {},
                 ),
@@ -162,7 +168,7 @@ class _SettingsViewState extends State<SettingsView> {
                   onPressed: () {},
                   icon: Icon(Icons.delete_outline, color: AppColors.red500),
                   label: Text(
-                    'Clear App Data',
+                    context.t('settingsView.clearData'),
                     style: TextStyle(color: AppColors.red500, fontSize: 16),
                   ),
                 ),
@@ -193,7 +199,7 @@ class _SettingsViewState extends State<SettingsView> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
           ),
         ],

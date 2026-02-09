@@ -21,6 +21,7 @@ import 'audio_settings_view.dart';
 import 'video_recorder_view.dart';
 import 'llm_advice_view.dart';
 import '../models/pending_media.dart';
+import '../models/analysis_result.dart';
 import '../services/offline_storage_service.dart';
 import 'marketing_home_page.dart';
 
@@ -47,6 +48,14 @@ class _MainAppState extends State<MainApp> {
   Future<void> _initApp() async {
     await preferencesService.init();
     await consentService.init();
+    
+    // US15: Attempt to sync any pending offline media
+    // Fire and forget - don't block app startup
+    offlineStorageService.syncAllPending().then((result) {
+      if (result.success > 0) {
+        debugPrint('Synced ${result.success} offline items');
+      }
+    });
 
     final hasConsent = await consentService.hasConsent();
     
@@ -91,11 +100,26 @@ class _MainAppState extends State<MainApp> {
   }
 
   void _handleLoginComplete() async {
-    await consentService.giveConsent();
+    // US5: Explicitly require consent even after login
+    // Don't auto-grant consent. Check if already given?
+    // If we consider "Login" as "Account Creation", we should show consent.
     
     if (!mounted) return;
     
-    // Check if language is selected
+    final hasConsent = await consentService.hasConsent();
+    
+    if (hasConsent) {
+      // Already consented (maybe previous session)
+      _checkLanguageAndProceed();
+    } else {
+      // Send to consent screen
+      setState(() {
+        _appState = 'consent';
+      });
+    }
+  }
+
+  void _checkLanguageAndProceed() {
     final languageProvider = context.read<LanguageProvider>();
     if (!languageProvider.isLanguageSelected) {
       setState(() {
@@ -211,7 +235,7 @@ class _MainAppState extends State<MainApp> {
       case 'camera':
         return CameraCaptureView(
           onBack: () => _navigateTo('home'),
-          onCapture: (path) async {
+          onCapture: (path, {String? base64Content}) async {
             // Show loading
             showDialog(
               context: context,
@@ -261,9 +285,32 @@ class _MainAppState extends State<MainApp> {
             } catch (e) {
               if (!mounted) return;
               Navigator.pop(context); // Hide loading
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Error analyzing image: $e')),
-              );
+              
+              // US15: Offline Fallback - Save to PendingMedia
+              try {
+                final media = PendingMedia(
+                  id: DateTime.now().millisecondsSinceEpoch.toString(),
+                  filePath: path,
+                  fileType: 'image',
+                  createdAt: DateTime.now().millisecondsSinceEpoch,
+                  base64Content: base64Content, // For web persistence
+                );
+                
+                await offlineStorageService.savePendingMedia(media);
+                
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Offline: Image saved to history for later'),
+                    backgroundColor: AppColors.nature600,
+                  ),
+                );
+                _navigateTo('home');
+              } catch (saveError) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error analyzing and saving: $e')),
+                );
+              }
             }
           },
         );
@@ -283,38 +330,60 @@ class _MainAppState extends State<MainApp> {
             );
             
             try {
-              // Analyze first image
-              final result = await cropService.analyzeImage(paths.first);
+              AnalysisResult? firstResult;
+              int successCount = 0;
+
+              // US12: Process multiple images
+              for (int i = 0; i < paths.length; i++) {
+                final path = paths[i];
+                // Update loading status if we could (requires stateful builder in dialog, skipping for simplicity)
+                
+                final result = await cropService.analyzeImage(path);
+                if (i == 0) firstResult = result;
+                successCount++;
+              }
               
               if (!mounted) return;
               Navigator.pop(context); // Hide loading
               
-              // Show Result
-              await showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                backgroundColor: Colors.transparent,
-                builder: (context) => Container(
-                  height: MediaQuery.of(context).size.height * 0.9,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(24),
-                      topRight: Radius.circular(24),
+              // Show notification for multiple items
+              if (paths.length > 1) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Analyzed $successCount images. Results saved to history.'),
+                    backgroundColor: AppColors.nature600,
+                  ),
+                );
+              }
+
+              // Show Result of the first one
+              if (firstResult != null) {
+                await showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (context) => Container(
+                    height: MediaQuery.of(context).size.height * 0.9,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(24),
+                        topRight: Radius.circular(24),
+                      ),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(24),
+                        topRight: Radius.circular(24),
+                      ),
+                      child: CropAdviceCard(
+                        result: firstResult!,
+                        onClose: () => Navigator.pop(context),
+                      ),
                     ),
                   ),
-                  child: ClipRRect(
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(24),
-                      topRight: Radius.circular(24),
-                    ),
-                    child: CropAdviceCard(
-                      result: result,
-                      onClose: () => Navigator.pop(context),
-                    ),
-                  ),
-                ),
-              );
+                );
+              }
               
               if (!mounted) return;
               _navigateTo('home');
@@ -323,7 +392,7 @@ class _MainAppState extends State<MainApp> {
               if (!mounted) return;
               Navigator.pop(context); // Hide loading
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Error analyzing image: $e')),
+                SnackBar(content: Text('Error analyzing images: $e')),
               );
             }
           },
@@ -335,7 +404,7 @@ class _MainAppState extends State<MainApp> {
       case 'video':
         return VideoRecorderView(
           onBack: () => _navigateTo('home'),
-          onCapture: (path) async {
+          onVideoRecorded: (path) async {
             // Save as pending media
             final media = PendingMedia(
               id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -388,7 +457,9 @@ class _MainAppState extends State<MainApp> {
           onBack: () => _navigateTo('home'),
         );
       case 'llm-advice':
-        return _buildPlaceholderView('LLM Advice', Icons.auto_awesome);
+        return LlmAdviceView(
+          onBack: () => _navigateTo('home'),
+        );
       default:
         return HomeView(
           onNavigate: _navigateTo,

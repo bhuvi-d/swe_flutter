@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
 import '../core/localization/translation_service.dart';
+import '../services/consent_service.dart';
 
 /// HomeView - Main app home screen with action grid
 /// Matches React's HomeView component in CropDiagnosisApp.jsx
-class HomeView extends StatelessWidget {
+class HomeView extends StatefulWidget {
   final Function(String) onNavigate;
   final bool isOnline;
 
@@ -13,6 +14,28 @@ class HomeView extends StatelessWidget {
     required this.onNavigate,
     this.isOnline = true,
   });
+
+  @override
+  State<HomeView> createState() => _HomeViewState();
+}
+
+class _HomeViewState extends State<HomeView> {
+  bool _isGuest = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkGuestMode();
+  }
+
+  Future<void> _checkGuestMode() async {
+    final isGuest = await consentService.isGuestMode();
+    if (mounted) {
+      setState(() {
+        _isGuest = isGuest;
+      });
+    }
+  }
 
   String _getGreetingKey() {
     final hour = DateTime.now().hour;
@@ -45,6 +68,12 @@ class HomeView extends StatelessWidget {
               _buildHeader(context),
               const SizedBox(height: 24),
 
+              // US6: Guest Mode Banner
+              if (_isGuest) ...[
+                _buildGuestBanner(context),
+                const SizedBox(height: 24),
+              ],
+
               // Main Actions Grid
               _buildMainActionsGrid(context),
               const SizedBox(height: 16),
@@ -69,6 +98,62 @@ class HomeView extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildGuestBanner(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.purple50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.purple200),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.purple100,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.person_add, color: AppColors.purple600),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Guest Mode',
+                  style: TextStyle(
+                    color: AppColors.purple700,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                Text(
+                  'Sign up to save your diagnosis capability.',
+                  style: TextStyle(
+                    color: AppColors.purple600,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => widget.onNavigate('login'), // Redirect to login
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.purple600,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+            ),
+            child: const Text('Join'),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   Widget _buildHeader(BuildContext context) {
     return Row(
@@ -124,18 +209,18 @@ class HomeView extends StatelessWidget {
         ),
         Row(
           children: [
-            // Audio Settings Button
+             // Audio Settings Button
             _buildHeaderButton(
               context,
               icon: Icons.volume_up,
-              onTap: () => onNavigate('audio-settings'),
+              onTap: () => widget.onNavigate('audio-settings'),
             ),
             const SizedBox(width: 8),
             // Settings Button
             _buildHeaderButton(
               context,
               icon: Icons.settings,
-              onTap: () => onNavigate('settings'),
+              onTap: () => widget.onNavigate('settings'),
             ),
             const SizedBox(width: 8),
             // Profile Button
@@ -144,7 +229,7 @@ class HomeView extends StatelessWidget {
                 _buildHeaderButton(
                   context,
                   icon: Icons.person_outline,
-                  onTap: () => onNavigate('profile'),
+                  onTap: () => widget.onNavigate('profile'),
                 ),
                 Positioned(
                   top: 0,
@@ -205,7 +290,7 @@ class HomeView extends StatelessWidget {
               color: AppColors.blue500,
               bgColor: AppColors.blue100,
               bgColorLight: AppColors.blue50,
-              onTap: () => onNavigate('upload'),
+              onTap: () => widget.onNavigate('upload'),
             ),
             _buildActionCard(
               context,
@@ -214,7 +299,7 @@ class HomeView extends StatelessWidget {
               color: AppColors.purple600,
               bgColor: AppColors.purple100,
               bgColorLight: AppColors.purple50,
-              onTap: () => onNavigate('voice'),
+              onTap: () => widget.onNavigate('voice'),
             ),
             _buildActionCard(
               context,
@@ -223,7 +308,7 @@ class HomeView extends StatelessWidget {
               color: AppColors.red500,
               bgColor: AppColors.red100,
               bgColorLight: AppColors.red50,
-              onTap: () => onNavigate('video'),
+              onTap: () => widget.onNavigate('video'),
             ),
             _buildActionCard(
               context,
@@ -232,7 +317,7 @@ class HomeView extends StatelessWidget {
               color: AppColors.amber600,
               bgColor: AppColors.amber100,
               bgColorLight: AppColors.amber50,
-              onTap: () => onNavigate('history'),
+              onTap: () => widget.onNavigate('history'),
             ),
             _buildActionCard(
               context,
@@ -241,7 +326,7 @@ class HomeView extends StatelessWidget {
               color: const Color(0xFF059669),
               bgColor: const Color(0xFFD1FAE5),
               bgColorLight: AppColors.teal50,
-              onTap: () => onNavigate('llm-advice'),
+              onTap: () => widget.onNavigate('llm-advice'),
             ),
           ],
         ),
@@ -255,7 +340,7 @@ class HomeView extends StatelessWidget {
       elevation: 4,
       shadowColor: const Color(0xFF10B981).withOpacity(0.3),
       child: InkWell(
-        onTap: () => onNavigate('camera'),
+        onTap: () => widget.onNavigate('camera'),
         borderRadius: BorderRadius.circular(24),
         child: Container(
           padding: const EdgeInsets.all(24),
@@ -582,8 +667,8 @@ class HomeView extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         _buildStatusItem(
-          isOnline ? Colors.green : AppColors.amber600,
-          isOnline ? context.t('homeView.status.online') : context.t('homeView.status.offline'),
+          widget.isOnline ? Colors.green : AppColors.amber600,
+          widget.isOnline ? context.t('homeView.status.online') : context.t('homeView.status.offline'),
         ),
         const SizedBox(width: 24),
         _buildStatusItem(

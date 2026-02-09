@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
@@ -11,14 +12,32 @@ import 'services/consent_service.dart';
 import 'services/audio_service.dart';
 import 'screens/main_app.dart';
 
+// Firebase conditionally imported for platforms that support it
+import 'package:firebase_core/firebase_core.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Set preferred orientations
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+  // Initialize Firebase (may fail on web without configuration)
+  try {
+    if (!kIsWeb) {
+      // Only initialize on mobile for now as web requires options
+      // which are not yet configured. The app will use Demo Mode on web.
+      await Firebase.initializeApp();
+    } else {
+      debugPrint('Web: Skipping Firebase init to force Demo Mode (no options)');
+    }
+  } catch (e) {
+    debugPrint('Firebase initialization failed: $e');
+  }
+
+  // Set preferred orientations (only on mobile)
+  if (!kIsWeb) {
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+  }
 
   // Set system UI overlay style
   SystemChrome.setSystemUIOverlayStyle(

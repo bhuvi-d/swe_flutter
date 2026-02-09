@@ -31,6 +31,9 @@ class AppTheme {
           fontSize: 18,
           fontWeight: FontWeight.w600,
           color: AppColors.gray800,
+        ).copyWith(
+          // US3: Fallback for Indic languages
+          fontFamilyFallback: ['Noto Sans', 'Arial', 'sans-serif'],
         ),
         iconTheme: const IconThemeData(color: AppColors.gray600),
       ),
@@ -124,168 +127,174 @@ class AppTheme {
   // TEXT THEMES
   // ============================================
   static TextTheme get _textTheme {
+    // Shared fallback fonts for Indic languages (US3)
+    const fallbacks = ['Noto Sans', 'Arial', 'sans-serif'];
+
     return TextTheme(
       displayLarge: GoogleFonts.inter(
         fontSize: 72,
         fontWeight: FontWeight.w800,
         letterSpacing: -2,
         color: AppColors.gray800,
-      ),
+      ).copyWith(fontFamilyFallback: fallbacks),
       displayMedium: GoogleFonts.inter(
         fontSize: 48,
         fontWeight: FontWeight.w700,
         color: AppColors.gray800,
-      ),
+      ).copyWith(fontFamilyFallback: fallbacks),
       displaySmall: GoogleFonts.inter(
         fontSize: 36,
         fontWeight: FontWeight.w700,
         color: AppColors.gray800,
-      ),
+      ).copyWith(fontFamilyFallback: fallbacks),
       headlineLarge: GoogleFonts.inter(
         fontSize: 32,
         fontWeight: FontWeight.w700,
         color: AppColors.gray800,
-      ),
+      ).copyWith(fontFamilyFallback: fallbacks),
       headlineMedium: GoogleFonts.inter(
         fontSize: 28,
         fontWeight: FontWeight.w600,
         color: AppColors.gray800,
-      ),
+      ).copyWith(fontFamilyFallback: fallbacks),
       headlineSmall: GoogleFonts.inter(
         fontSize: 24,
         fontWeight: FontWeight.w600,
         color: AppColors.gray800,
-      ),
+      ).copyWith(fontFamilyFallback: fallbacks),
       titleLarge: GoogleFonts.inter(
         fontSize: 20,
         fontWeight: FontWeight.w600,
         color: AppColors.gray800,
-      ),
+      ).copyWith(fontFamilyFallback: fallbacks),
       titleMedium: GoogleFonts.inter(
         fontSize: 18,
         fontWeight: FontWeight.w600,
         color: AppColors.gray700,
-      ),
+      ).copyWith(fontFamilyFallback: fallbacks),
       titleSmall: GoogleFonts.inter(
         fontSize: 16,
         fontWeight: FontWeight.w600,
         color: AppColors.gray700,
-      ),
+      ).copyWith(fontFamilyFallback: fallbacks),
       bodyLarge: GoogleFonts.inter(
         fontSize: 18,
         fontWeight: FontWeight.w400,
         height: 1.7,
         color: AppColors.gray600,
-      ),
+      ).copyWith(fontFamilyFallback: fallbacks),
       bodyMedium: GoogleFonts.inter(
         fontSize: 16,
         fontWeight: FontWeight.w400,
         color: AppColors.gray600,
-      ),
+      ).copyWith(fontFamilyFallback: fallbacks),
       bodySmall: GoogleFonts.inter(
         fontSize: 14,
         fontWeight: FontWeight.w400,
         color: AppColors.gray500,
-      ),
+      ).copyWith(fontFamilyFallback: fallbacks),
       labelLarge: GoogleFonts.inter(
         fontSize: 16,
         fontWeight: FontWeight.w600,
         color: AppColors.gray700,
-      ),
+      ).copyWith(fontFamilyFallback: fallbacks),
       labelMedium: GoogleFonts.inter(
         fontSize: 14,
         fontWeight: FontWeight.w500,
         color: AppColors.gray600,
-      ),
+      ).copyWith(fontFamilyFallback: fallbacks),
       labelSmall: GoogleFonts.inter(
         fontSize: 12,
         fontWeight: FontWeight.w500,
         letterSpacing: 1,
         color: AppColors.gray500,
-      ),
+      ).copyWith(fontFamilyFallback: fallbacks),
     );
   }
 
   static TextTheme get _darkTextTheme {
+    // Shared fallback fonts for Indic languages (US3)
+    const fallbacks = ['Noto Sans', 'Arial', 'sans-serif'];
+
     return TextTheme(
       displayLarge: GoogleFonts.inter(
         fontSize: 72,
         fontWeight: FontWeight.w800,
         letterSpacing: -2,
         color: AppColors.textGreenLight,
-      ),
+      ).copyWith(fontFamilyFallback: fallbacks),
       displayMedium: GoogleFonts.inter(
         fontSize: 48,
         fontWeight: FontWeight.w700,
         color: AppColors.textPrimary,
-      ),
+      ).copyWith(fontFamilyFallback: fallbacks),
       displaySmall: GoogleFonts.inter(
         fontSize: 36,
         fontWeight: FontWeight.w700,
         color: AppColors.textPrimary,
-      ),
+      ).copyWith(fontFamilyFallback: fallbacks),
       headlineLarge: GoogleFonts.inter(
         fontSize: 32,
         fontWeight: FontWeight.w700,
         color: AppColors.textPrimary,
-      ),
+      ).copyWith(fontFamilyFallback: fallbacks),
       headlineMedium: GoogleFonts.inter(
         fontSize: 28,
         fontWeight: FontWeight.w500,
         letterSpacing: 1,
         color: AppColors.textGreenSubtle,
-      ),
+      ).copyWith(fontFamilyFallback: fallbacks),
       headlineSmall: GoogleFonts.inter(
         fontSize: 24,
         fontWeight: FontWeight.w600,
         color: AppColors.textPrimary,
-      ),
+      ).copyWith(fontFamilyFallback: fallbacks),
       titleLarge: GoogleFonts.inter(
         fontSize: 20,
         fontWeight: FontWeight.w600,
         color: AppColors.textPrimary,
-      ),
+      ).copyWith(fontFamilyFallback: fallbacks),
       titleMedium: GoogleFonts.inter(
         fontSize: 18,
         fontWeight: FontWeight.w600,
         color: AppColors.textPrimary,
-      ),
+      ).copyWith(fontFamilyFallback: fallbacks),
       titleSmall: GoogleFonts.inter(
         fontSize: 16,
         fontWeight: FontWeight.w600,
         color: AppColors.textSecondary,
-      ),
+      ).copyWith(fontFamilyFallback: fallbacks),
       bodyLarge: GoogleFonts.inter(
         fontSize: 18,
         fontWeight: FontWeight.w400,
         height: 1.7,
         color: AppColors.textGreenSubtle,
-      ),
+      ).copyWith(fontFamilyFallback: fallbacks),
       bodyMedium: GoogleFonts.inter(
         fontSize: 16,
         fontWeight: FontWeight.w400,
         color: AppColors.textSecondary,
-      ),
+      ).copyWith(fontFamilyFallback: fallbacks),
       bodySmall: GoogleFonts.inter(
         fontSize: 14,
         fontWeight: FontWeight.w400,
         color: AppColors.textSecondary,
-      ),
+      ).copyWith(fontFamilyFallback: fallbacks),
       labelLarge: GoogleFonts.inter(
         fontSize: 16,
         fontWeight: FontWeight.w600,
         color: AppColors.accentGreen,
-      ),
+      ).copyWith(fontFamilyFallback: fallbacks),
       labelMedium: GoogleFonts.inter(
         fontSize: 14,
         fontWeight: FontWeight.w500,
         color: AppColors.accentGreen,
-      ),
+      ).copyWith(fontFamilyFallback: fallbacks),
       labelSmall: GoogleFonts.inter(
         fontSize: 13,
         fontWeight: FontWeight.w500,
         color: AppColors.accentGreen,
-      ),
+      ).copyWith(fontFamilyFallback: fallbacks),
     );
   }
 }

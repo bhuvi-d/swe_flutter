@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
-import '../core/constants/app_constants.dart';
+import '../services/auth_service.dart';
+import '../services/audio_service.dart';
 
 /// LoginScreen - OTP-based authentication
 /// Matches React's LoginScreen.jsx
@@ -24,16 +26,46 @@ class _LoginScreenState extends State<LoginScreen> {
   
   String _step = 'phone'; // 'phone' or 'otp'
   bool _loading = false;
+  String? _verificationId;
+  
+  // US1: OTP Expiry Timer
+  int _resendSeconds = 0;
+  Timer? _resendTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    // Speak welcome message
+    audioService.speakGuidance('welcome');
+  }
 
   @override
   void dispose() {
     _phoneController.dispose();
     _otpController.dispose();
+    _resendTimer?.cancel();
     super.dispose();
   }
 
+  void _startResendTimer() {
+    setState(() {
+      _resendSeconds = 60;
+    });
+    _resendTimer?.cancel();
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_resendSeconds > 0) {
+        setState(() {
+          _resendSeconds--;
+        });
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
   Future<void> _sendOtp() async {
-    if (_phoneController.text.length != 10) {
+    final phone = _phoneController.text.trim();
+    if (phone.length != 10) {
       _showMessage('Please enter a valid 10-digit number');
       return;
     }
@@ -42,20 +74,40 @@ class _LoginScreenState extends State<LoginScreen> {
       _loading = true;
     });
 
-    // TODO: Implement Firebase phone auth
-    await Future.delayed(const Duration(seconds: 2));
-
-    setState(() {
-      _loading = false;
-      _step = 'otp';
-    });
-    
-    _showMessage('OTP has been sent. Please enter the code.');
+    try {
+      await authService.sendOtp(
+        phoneNumber: phone,
+        onCodeSent: (vid, token) {
+          setState(() {
+            _loading = false;
+            _step = 'otp';
+            _verificationId = vid;
+          });
+          _startResendTimer(); // Start expiry timer
+          _showMessage('OTP has been sent ${vid == 'mock_verification_id' ? '(Demo: 123456)' : ''}');
+          audioService.speakGuidance('otp');
+        },
+        onVerificationFailed: (e) {
+          setState(() => _loading = false);
+          _showMessage('Verification failed: ${e.message}');
+          audioService.confirmAction('error', message: 'Verification failed');
+        },
+        onVerificationCompleted: (credential) async {
+          // Auto-resolution (on Android)
+          setState(() => _loading = false);
+          _showMessage('Phone number verified automatically');
+          widget.onLogin();
+        },
+      );
+    } catch (e) {
+      setState(() => _loading = false);
+      _showMessage('Error: $e');
+    }
   }
 
   Future<void> _verifyOtp() async {
-    if (_otpController.text.isEmpty) {
-      _showMessage('Please enter OTP');
+    if (_otpController.text.length != 6) {
+      _showMessage('Please enter 6-digit OTP');
       return;
     }
 
@@ -63,15 +115,21 @@ class _LoginScreenState extends State<LoginScreen> {
       _loading = true;
     });
 
-    // TODO: Implement Firebase OTP verification
-    await Future.delayed(const Duration(seconds: 2));
-
-    setState(() {
-      _loading = false;
-    });
-
-    _showMessage('Login successful. Welcome to CropAid.');
-    widget.onLogin();
+    try {
+      await authService.verifyOtp(
+        verificationId: _verificationId!,
+        smsCode: _otpController.text,
+      );
+      
+      setState(() => _loading = false);
+      _showMessage('Login successful');
+      audioService.confirmAction('success', message: 'Welcome to Crop AId');
+      widget.onLogin();
+    } catch (e) {
+      setState(() => _loading = false);
+      _showMessage('Invalid OTP. Please try again.');
+      audioService.confirmAction('error', message: 'Invalid code');
+    }
   }
 
   void _showMessage(String message) {
@@ -294,6 +352,7 @@ class _LoginScreenState extends State<LoginScreen> {
             TextField(
               controller: _otpController,
               keyboardType: TextInputType.number,
+              autofillHints: const [AutofillHints.oneTimeCode], // US1: Auto-read support
               decoration: InputDecoration(
                 hintText: 'Enter OTP',
                 filled: true,
@@ -335,6 +394,20 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
+            ),
+            
+            const SizedBox(height: 16),
+            // US1: Resend Logic with Timer
+            Center(
+              child: _resendSeconds > 0
+                  ? Text(
+                      'Resend OTP in ${_resendSeconds}s',
+                      style: TextStyle(color: AppColors.gray500),
+                    )
+                  : TextButton(
+                      onPressed: _loading ? null : _sendOtp,
+                      child: const Text('Resend OTP'),
+                    ),
             ),
           ],
 

@@ -1,5 +1,7 @@
 
+import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../core/theme/app_colors.dart';
@@ -104,21 +106,21 @@ class _MediaGalleryState extends State<MediaGallery> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Thumbnail / Icon
+              // Thumbnail / Icon
             Container(
               width: 80,
               height: 80,
               decoration: BoxDecoration(
                 color: AppColors.gray100,
                 borderRadius: BorderRadius.circular(12),
-                image: item.filePath.isNotEmpty && File(item.filePath).existsSync() 
+                image: _getImageProvider(item) != null 
                     ? DecorationImage(
-                        image: FileImage(File(item.filePath)),
+                        image: _getImageProvider(item)!,
                         fit: BoxFit.cover,
                       )
                     : null,
               ),
-              child: item.filePath.isEmpty || !File(item.filePath).existsSync()
+              child: _getImageProvider(item) == null
                   ? Icon(
                       item.fileType == 'video' ? Icons.videocam : Icons.image,
                       size: 32,
@@ -195,5 +197,21 @@ class _MediaGalleryState extends State<MediaGallery> {
         ),
       ),
     );
+  }
+  ImageProvider? _getImageProvider(PendingMedia item) {
+    if (kIsWeb && item.base64Content != null && item.base64Content!.isNotEmpty) {
+      try {
+        return MemoryImage(base64Decode(item.base64Content!));
+      } catch (e) {
+        debugPrint('Error decoding base64 image: $e');
+        return null;
+      }
+    }
+    
+    if (item.filePath.isNotEmpty && File(item.filePath).existsSync()) {
+      return FileImage(File(item.filePath));
+    }
+    
+    return null;
   }
 }
