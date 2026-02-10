@@ -269,69 +269,85 @@ class _HomeViewState extends State<HomeView> {
   }
 
   Widget _buildMainActionsGrid(BuildContext context) {
-    return Column(
-      children: [
-        // Scan Plant - Full Width
-        _buildScanPlantCard(context),
-        const SizedBox(height: 16),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Calculate aspect ratio dynamically based on width
+        // Wider screens -> wider columns -> can translate to efficient ratio
+        // Narrow screens -> thicker columns -> need taller cards (lower ratio)
+        double aspectRatio = 0.8; 
+        if (constraints.maxWidth < 360) {
+          aspectRatio = 0.70; // Very small devices
+        } else if (constraints.maxWidth < 600) {
+          aspectRatio = 0.75; // Typical phones
+        } else {
+          aspectRatio = 1.0; // Tablets
+        }
 
-        // Action Grid
-        GridView.count(
-          crossAxisCount: 3,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 16,
-          crossAxisSpacing: 16,
-          childAspectRatio: 0.85, 
+        return Column(
           children: [
-            _buildActionCard(
-              context,
-              icon: Icons.upload_file,
-              label: context.t('homeView.actions.upload'),
-              color: AppColors.blue500,
-              bgColor: AppColors.blue100,
-              bgColorLight: AppColors.blue50,
-              onTap: () => widget.onNavigate('upload'),
-            ),
-            _buildActionCard(
-              context,
-              icon: Icons.mic,
-              label: context.t('homeView.actions.voice'),
-              color: AppColors.purple600,
-              bgColor: AppColors.purple100,
-              bgColorLight: AppColors.purple50,
-              onTap: () => widget.onNavigate('voice'),
-            ),
-            _buildActionCard(
-              context,
-              icon: Icons.videocam,
-              label: context.t('homeView.actions.record'),
-              color: AppColors.red500,
-              bgColor: AppColors.red100,
-              bgColorLight: AppColors.red50,
-              onTap: () => widget.onNavigate('video'),
-            ),
-            _buildActionCard(
-              context,
-              icon: Icons.history,
-              label: context.t('homeView.actions.history'),
-              color: AppColors.amber600,
-              bgColor: AppColors.amber100,
-              bgColorLight: AppColors.amber50,
-              onTap: () => widget.onNavigate('history'),
-            ),
-            _buildActionCard(
-              context,
-              icon: Icons.auto_awesome,
-              label: context.t('homeView.actions.llmAdvice'),
-              color: const Color(0xFF059669),
-              bgColor: const Color(0xFFD1FAE5),
-              bgColorLight: AppColors.teal50,
-              onTap: () => widget.onNavigate('llm-advice'),
+            // Scan Plant - Full Width
+            _buildScanPlantCard(context),
+            const SizedBox(height: 16),
+
+            // Action Grid
+            GridView.count(
+              crossAxisCount: 3,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+              childAspectRatio: aspectRatio,
+              children: [
+                _buildActionCard(
+                  context,
+                  icon: Icons.upload_file,
+                  label: context.t('homeView.actions.upload'),
+                  color: AppColors.blue500,
+                  bgColor: AppColors.blue100,
+                  bgColorLight: AppColors.blue50,
+                  onTap: () => widget.onNavigate('upload'),
+                ),
+                _buildActionCard(
+                  context,
+                  icon: Icons.mic,
+                  label: context.t('homeView.actions.voice'),
+                  color: AppColors.purple600,
+                  bgColor: AppColors.purple100,
+                  bgColorLight: AppColors.purple50,
+                  onTap: () => widget.onNavigate('voice'),
+                ),
+                _buildActionCard(
+                  context,
+                  icon: Icons.videocam,
+                  label: context.t('homeView.actions.record'),
+                  color: AppColors.red500,
+                  bgColor: AppColors.red100,
+                  bgColorLight: AppColors.red50,
+                  onTap: () => widget.onNavigate('video'),
+                ),
+                _buildActionCard(
+                  context,
+                  icon: Icons.history,
+                  label: context.t('homeView.actions.history'),
+                  color: AppColors.amber600,
+                  bgColor: AppColors.amber100,
+                  bgColorLight: AppColors.amber50,
+                  onTap: () => widget.onNavigate('history'),
+                ),
+                _buildActionCard(
+                  context,
+                  icon: Icons.auto_awesome,
+                  label: context.t('homeView.actions.llmAdvice'),
+                  color: const Color(0xFF059669),
+                  bgColor: const Color(0xFFD1FAE5),
+                  bgColorLight: AppColors.teal50,
+                  onTap: () => widget.onNavigate('llm-advice'),
+                ),
+              ],
             ),
           ],
-        ),
-      ],
+        );
+      },
     );
   }
 
@@ -383,12 +399,15 @@ class _HomeViewState extends State<HomeView> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Text(
-                      context.t('homeView.scanPlant'),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        context.t('homeView.scanPlant'),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -441,7 +460,7 @@ class _HomeViewState extends State<HomeView> {
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(12), // Reduced padding slightly
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: AppColors.gray100),
@@ -459,19 +478,25 @@ class _HomeViewState extends State<HomeView> {
                   ),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(icon, size: 32, color: color),
+                child: Icon(icon, size: 28, color: color), // Slightly smaller icon
               ),
               const SizedBox(height: 12),
-              Text(
-                label,
-                style: TextStyle(
-                  color: AppColors.gray700,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
+              Expanded(
+                child: Center(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        color: AppColors.gray700,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                    ),
+                  ),
                 ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),

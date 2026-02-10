@@ -258,7 +258,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildLoginCard() {
     return Container(
-      width: 400,
+      constraints: const BoxConstraints(maxWidth: 400),
+      width: double.infinity,
       padding: const EdgeInsets.all(40),
       decoration: BoxDecoration(
         color: Colors.white,
