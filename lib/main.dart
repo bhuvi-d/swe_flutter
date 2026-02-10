@@ -14,6 +14,7 @@ import 'screens/main_app.dart';
 
 // Firebase conditionally imported for platforms that support it
 import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
 /// The main entry point for the CropAId application.
 /// 
@@ -27,15 +28,11 @@ import 'package:firebase_core/firebase_core.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase (may fail on web without configuration)
+  // Initialize Firebase
   try {
-    if (!kIsWeb) {
-      // Only initialize on mobile for now as web requires options
-      // which are not yet configured. The app will use Demo Mode on web.
-      await Firebase.initializeApp();
-    } else {
-      debugPrint('Web: Skipping Firebase init to force Demo Mode (no options)');
-    }
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
   } catch (e) {
     debugPrint('Firebase initialization failed: $e');
   }

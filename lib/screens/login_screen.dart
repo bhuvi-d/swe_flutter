@@ -97,7 +97,7 @@ class _LoginScreenState extends State<LoginScreen> {
             _verificationId = vid;
           });
           _startResendTimer(); // Start expiry timer
-          _showMessage('OTP has been sent ${vid == 'mock_verification_id' ? '(Demo: 123456)' : ''}');
+          _showMessage('OTP has been sent successfully');
           audioService.speakGuidance('otp');
         },
         onVerificationFailed: (e) {
