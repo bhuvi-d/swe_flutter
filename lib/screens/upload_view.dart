@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
 import '../core/theme/app_colors.dart';
 import '../core/localization/translation_service.dart';
@@ -9,6 +10,7 @@ import '../services/audio_service.dart';
 /// 
 /// User Stories Covered:
 /// - US12: Upload multiple images with thumbnail carousel.
+/// - US12: Camera batch capture support.
 /// - US16: Confirmation of uploaded/selected media.
 /// 
 /// Matches React's `UploadView` component in `CropDiagnosisApp.jsx`.
@@ -59,12 +61,50 @@ class _UploadViewState extends State<UploadView> {
         });
 
         audioService.playSound('click');
+        audioService.speak('${images.length} images added. Total: ${_selectedImages.length}.');
       }
     } catch (e) {
       debugPrint('Error selecting images: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error selecting images: $e')),
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error selecting images: $e')),
+        );
+      }
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  /// US12: Captures a photo from camera and adds it to the batch.
+  Future<void> _captureFromCamera() async {
+    setState(() => _isLoading = true);
+    
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: kIsWeb ? ImageSource.gallery : ImageSource.camera,
+        imageQuality: 85,
+        maxWidth: 1920,
+        maxHeight: 1920,
       );
+
+      if (image != null) {
+        final bytes = await image.readAsBytes();
+        _imagePreviews[image.path] = bytes;
+
+        setState(() {
+          _selectedImages.add(image);
+        });
+
+        audioService.playSound('click');
+        audioService.speak('Photo captured. Total: ${_selectedImages.length} images.');
+      }
+    } catch (e) {
+      debugPrint('Error capturing from camera: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error capturing photo: $e')),
+        );
+      }
     } finally {
       setState(() => _isLoading = false);
     }
@@ -88,8 +128,8 @@ class _UploadViewState extends State<UploadView> {
 
     final paths = _selectedImages.map((img) => img.path).toList();
     
-    // US16: Success confirmation
-    audioService.confirmAction('success', message: 'Images ready for analysis');
+    // US16: Success confirmation with voice
+    audioService.confirmAction('success', message: '${paths.length} images ready for analysis');
     
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -166,22 +206,35 @@ class _UploadViewState extends State<UploadView> {
 
                 const SizedBox(height: 20),
 
-                // Action Buttons
+                // Action Buttons - US12: Gallery + Camera + Upload
                 Row(
                   children: [
+                    // Gallery picker button
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: _isLoading ? null : _selectImages,
-                        icon: const Icon(Icons.add_photo_alternate),
+                        icon: const Icon(Icons.photo_library, size: 20),
                         label: Text(context.t('uploadView.addMore')),
                         style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                           side: const BorderSide(color: AppColors.nature500),
                           foregroundColor: AppColors.nature600,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 8),
+                    // US12: Camera batch capture button
+                    OutlinedButton(
+                      onPressed: _isLoading ? null : _captureFromCamera,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                        side: const BorderSide(color: AppColors.nature500),
+                        foregroundColor: AppColors.nature600,
+                      ),
+                      child: const Icon(Icons.camera_alt, size: 22),
+                    ),
+                    const SizedBox(width: 8),
+                    // Upload/Analyze button
                     Expanded(
                       flex: 2,
                       child: ElevatedButton.icon(
@@ -195,7 +248,7 @@ class _UploadViewState extends State<UploadView> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.nature600,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                           disabledBackgroundColor: AppColors.gray300,
                         ),
                       ),
@@ -245,6 +298,16 @@ class _UploadViewState extends State<UploadView> {
             style: TextStyle(
               fontSize: 16,
               color: AppColors.gray500,
+            ),
+          ),
+          const SizedBox(height: 16),
+          // US12: Camera batch capture hint
+          Text(
+            'or use the camera button below',
+            style: TextStyle(
+              fontSize: 14,
+              color: AppColors.nature500,
+              fontStyle: FontStyle.italic,
             ),
           ),
           const SizedBox(height: 24),
@@ -362,6 +425,26 @@ class _UploadViewState extends State<UploadView> {
                           Icons.close,
                           size: 16,
                           color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Image number badge
+                  Positioned(
+                    bottom: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.6),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${index + 1}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
 import '../core/localization/translation_service.dart';
 import '../services/consent_service.dart';
+import '../services/offline_storage_service.dart';
 
 /// HomeView - Main app home screen with action grid.
 /// 
@@ -29,11 +30,14 @@ class HomeView extends StatefulWidget {
 
 class _HomeViewState extends State<HomeView> {
   bool _isGuest = false;
+  int _pendingSyncCount = 0; // US15: Pending offline sync count
+
 
   @override
   void initState() {
     super.initState();
     _checkGuestMode();
+    _loadPendingSyncCount();
   }
 
   /// Checks if the user is in guest mode to display the banner.
@@ -43,6 +47,14 @@ class _HomeViewState extends State<HomeView> {
       setState(() {
         _isGuest = isGuest;
       });
+    }
+  }
+
+  /// US15: Loads the count of pending offline media items.
+  Future<void> _loadPendingSyncCount() async {
+    final count = await offlineStorageService.getPendingCount();
+    if (mounted) {
+      setState(() => _pendingSyncCount = count);
     }
   }
 
@@ -719,6 +731,15 @@ class _HomeViewState extends State<HomeView> {
           widget.isOnline ? context.t('homeView.status.online') : context.t('homeView.status.offline'),
         ),
         const SizedBox(width: 24),
+        // US15: Offline sync indicator
+        if (_pendingSyncCount > 0)
+          _buildStatusItem(
+            AppColors.amber600,
+            '$_pendingSyncCount pending',
+            icon: Icons.cloud_upload,
+          ),
+        if (_pendingSyncCount > 0)
+          const SizedBox(width: 24),
         _buildStatusItem(
           AppColors.gray500,
           context.t('homeView.status.mobile'),

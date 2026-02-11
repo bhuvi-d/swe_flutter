@@ -10,8 +10,8 @@ import '../core/localization/translation_service.dart';
 import '../services/audio_service.dart';
 
 /// Video Recorder View - Record short videos for diagnosis
-/// US13: Record short videos with duration limits
-/// US16: Confirmation of captured input
+/// US13: Record short videos with duration limits and size info
+/// US16: Confirmation of captured input with voice feedback
 class VideoRecorderView extends StatefulWidget {
   final VoidCallback onBack;
   final Function(String videoPath) onVideoRecorded;
@@ -34,9 +34,12 @@ class _VideoRecorderViewState extends State<VideoRecorderView> {
   int _recordingDuration = 0;
   Timer? _durationTimer;
   VideoPlayerController? _videoController;
+  String _videoSizeInfo = ''; // US13: File size display
+  bool _isSubmitting = false;
   
   // US13: Duration limit (30 seconds)
   static const int maxDurationSeconds = 30;
+  static const double maxSizeMb = 50.0;
 
   @override
   void initState() {
@@ -58,6 +61,7 @@ class _VideoRecorderViewState extends State<VideoRecorderView> {
     setState(() {
       _isRecording = true;
       _recordingDuration = 0;
+      _videoSizeInfo = '';
     });
 
     // Start duration timer for UI feedback
@@ -78,15 +82,20 @@ class _VideoRecorderViewState extends State<VideoRecorderView> {
       _durationTimer?.cancel();
 
       if (video != null) {
+        // US13: Get file size info
+        final int sizeInBytes = await video.length();
+        final double sizeInMb = sizeInBytes / (1024 * 1024);
+        
         await _initializeVideoPlayer(video);
         setState(() {
           _isRecording = false;
           _hasVideo = true;
           _recordedVideo = video;
+          _videoSizeInfo = '${sizeInMb.toStringAsFixed(1)} MB';
         });
         
-        // US16: Confirmation
-        audioService.confirmAction('success', message: 'Video recorded successfully');
+        // US16: Confirmation with voice
+        audioService.confirmAction('success', message: 'Video recorded successfully. Size: ${sizeInMb.toStringAsFixed(1)} megabytes.');
       } else {
         _stopRecording(); // Reset state if cancelled
       }
@@ -141,22 +150,29 @@ class _VideoRecorderViewState extends State<VideoRecorderView> {
       _hasVideo = false;
       _recordedVideo = null;
       _recordingDuration = 0;
+      _videoSizeInfo = '';
     });
   }
 
-  /// US13 & US16: Submit video
+  /// US13 & US16: Submit video with size validation
   Future<void> _submitVideo() async {
-    if (_recordedVideo == null) return;
+    if (_recordedVideo == null || _isSubmitting) return;
+    
+    setState(() => _isSubmitting = true);
     
     // US13: Check file size (approx limit for 30s video)
     final int sizeInBytes = await _recordedVideo!.length();
     final double sizeInMb = sizeInBytes / (1024 * 1024);
     
-    if (sizeInMb > 50) {
+    if (sizeInMb > maxSizeMb) {
       if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      
+      audioService.confirmAction('error', message: 'Video is too large. Please record a shorter video.');
+      
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Video is too large (>50MB). Please record a shorter video.'),
+        SnackBar(
+          content: Text('Video is too large (${sizeInMb.toStringAsFixed(1)}MB > ${maxSizeMb.toInt()}MB). Please record a shorter video.'),
           backgroundColor: AppColors.red600,
         ),
       );
@@ -165,7 +181,9 @@ class _VideoRecorderViewState extends State<VideoRecorderView> {
     
     if (!mounted) return;
 
-    // US16: Final confirmation
+    // US16: Final confirmation with voice
+    audioService.confirmAction('success', message: 'Video submitted for analysis.');
+    
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -179,6 +197,7 @@ class _VideoRecorderViewState extends State<VideoRecorderView> {
       ),
     );
 
+    setState(() => _isSubmitting = false);
     widget.onVideoRecorded(_recordedVideo!.path);
   }
 
@@ -218,11 +237,62 @@ class _VideoRecorderViewState extends State<VideoRecorderView> {
                 child: _buildPreviewArea(),
               ),
 
+              // US13: Size info display
+              if (_videoSizeInfo.isNotEmpty) _buildSizeInfo(),
+
               // Controls
               _buildControls(),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// US13: Shows video file size information before upload.
+  Widget _buildSizeInfo() {
+    final double sizeValue = double.tryParse(_videoSizeInfo.replaceAll(' MB', '')) ?? 0;
+    final bool isLarge = sizeValue > maxSizeMb * 0.7; // Warn at 70% of max
+    final bool isTooLarge = sizeValue > maxSizeMb;
+    
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: isTooLarge 
+            ? AppColors.red600.withOpacity(0.2)
+            : (isLarge ? AppColors.amber600.withOpacity(0.2) : AppColors.nature600.withOpacity(0.2)),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isTooLarge ? AppColors.red500 : (isLarge ? AppColors.amber600 : AppColors.nature500),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            isTooLarge ? Icons.error : (isLarge ? Icons.warning : Icons.sd_storage),
+            color: isTooLarge ? AppColors.red400 : (isLarge ? AppColors.amber300 : AppColors.nature400),
+            size: 18,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'Size: $_videoSizeInfo / ${maxSizeMb.toInt()} MB',
+            style: TextStyle(
+              color: isTooLarge ? AppColors.red300 : (isLarge ? AppColors.amber300 : Colors.white70),
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          if (isTooLarge) ...[
+            const SizedBox(width: 8),
+            Text(
+              '(Too large)',
+              style: TextStyle(color: AppColors.red400, fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -384,9 +454,14 @@ class _VideoRecorderViewState extends State<VideoRecorderView> {
                 const SizedBox(width: 20),
                 // Submit button
                 ElevatedButton.icon(
-                  onPressed: _submitVideo,
-                  icon: const Icon(Icons.check),
-                  label: const Text('Use Video'),
+                  onPressed: _isSubmitting ? null : _submitVideo,
+                  icon: _isSubmitting 
+                      ? const SizedBox(
+                          width: 18, height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.check),
+                  label: Text(_isSubmitting ? 'Submitting...' : 'Use Video'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.nature600,
                     foregroundColor: Colors.white,
