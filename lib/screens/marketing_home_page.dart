@@ -187,7 +187,7 @@ class _MarketingHomePageState extends State<MarketingHomePage> {
           fontSize: isDesktop ? 72 : 48,
           fontWeight: FontWeight.w800,
           height: 1.1,
-          color: Colors.transparent,
+          color: Colors.white,
           shadows: [
             Shadow(
               color: AppColors.accentGreen.withOpacity(0.5),
