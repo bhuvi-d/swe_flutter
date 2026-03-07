@@ -13,5 +13,3 @@
 void RegisterPlugins(flutter::PluginRegistry* registry);
 
 #endif  // GENERATED_PLUGIN_REGISTRANT_
-
-// Trace update 172
