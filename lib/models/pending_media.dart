@@ -85,3 +85,11 @@ class PendingMedia {
       id: json['id'],
       filePath: json['filePath'],
       fileType: json['fileType'],
+      voiceTranscription: json['voiceTranscription'],
+      durationSeconds: json['durationSeconds'] ?? 0,
+      createdAt: json['createdAt'],
+      isSynced: json['isSynced'] ?? false,
+      base64Content: json['base64Content'],
+    );
+  }
+}

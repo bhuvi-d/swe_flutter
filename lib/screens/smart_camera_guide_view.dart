@@ -239,5 +239,9 @@ class SmartCameraGuideView extends StatelessWidget {
                 ),
               ],
             ),
-
-// Trace update 56
+          ),
+        ],
+      ),
+    );
+  }
+}

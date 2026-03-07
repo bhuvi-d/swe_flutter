@@ -258,3 +258,23 @@ class _HistoryViewState extends State<HistoryView> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 20)]),
+            child: const Icon(LucideIcons.clipboardList, size: 64, color: AppColors.gray300),
+          ),
+          const SizedBox(height: 24),
+          const Text('No Activity Yet', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.gray800)),
+          const SizedBox(height: 8),
+          const Text('Your analyzed crops will appear here.', style: TextStyle(color: AppColors.gray500, fontSize: 14)),
+          const SizedBox(height: 32),
+          ElevatedButton(
+            onPressed: widget.onBack,
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.nature600, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+            child: const Text('Start Diagnosis'),
+          ),
+        ],
+      ),
+    );
+  }
+}

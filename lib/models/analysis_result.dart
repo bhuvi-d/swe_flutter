@@ -43,6 +43,9 @@ class AnalysisResult {
   /// Preventive measures to avoid future occurrences.
   final String prevention;
 
+  /// Step-by-step treatment instructions.
+  final List<String> treatmentSteps;
+
   /// Creates an [AnalysisResult] instance.
   AnalysisResult({
     required this.id,
@@ -58,6 +61,7 @@ class AnalysisResult {
     required this.chemical,
     required this.organic,
     required this.prevention,
+    required this.treatmentSteps,
   });
 
   /// Converts the [AnalysisResult] instance to a JSON map.
@@ -76,6 +80,7 @@ class AnalysisResult {
       'chemical': chemical,
       'organic': organic,
       'prevention': prevention,
+      'treatmentSteps': treatmentSteps,
     };
   }
 
@@ -95,6 +100,44 @@ class AnalysisResult {
       chemical: json['chemical'] ?? '',
       organic: json['organic'] ?? '',
       prevention: json['prevention'] ?? '',
+      treatmentSteps: json['treatmentSteps'] != null 
+          ? List<String>.from(json['treatmentSteps']) 
+          : [],
+    );
+  }
+
+  /// Creates a copy of this [AnalysisResult] with the given fields replaced.
+  AnalysisResult copyWith({
+    String? id,
+    DateTime? date,
+    String? imageUrl,
+    String? crop,
+    String? disease,
+    double? confidence,
+    String? severity,
+    String? cause,
+    String? symptoms,
+    String? immediate,
+    String? chemical,
+    String? organic,
+    String? prevention,
+    List<String>? treatmentSteps,
+  }) {
+    return AnalysisResult(
+      id: id ?? this.id,
+      date: date ?? this.date,
+      imageUrl: imageUrl ?? this.imageUrl,
+      crop: crop ?? this.crop,
+      disease: disease ?? this.disease,
+      confidence: confidence ?? this.confidence,
+      severity: severity ?? this.severity,
+      cause: cause ?? this.cause,
+      symptoms: symptoms ?? this.symptoms,
+      immediate: immediate ?? this.immediate,
+      chemical: chemical ?? this.chemical,
+      organic: organic ?? this.organic,
+      prevention: prevention ?? this.prevention,
+      treatmentSteps: treatmentSteps ?? this.treatmentSteps,
     );
   }
 }

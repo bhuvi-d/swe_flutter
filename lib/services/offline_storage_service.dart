@@ -153,3 +153,10 @@ class SyncResult {
 
   SyncResult({
     required this.success,
+    required this.failed,
+    required this.message,
+  });
+}
+
+/// Global singleton instance
+final offlineStorageService = OfflineStorageService();

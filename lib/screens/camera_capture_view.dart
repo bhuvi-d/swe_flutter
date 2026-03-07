@@ -743,4 +743,11 @@ class _CameraCaptureViewState extends State<CameraCaptureView> with WidgetsBindi
                   ),
                 ),
 
-// Unit 116 by Akshith1413
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

@@ -27,5 +27,3 @@ void RegisterPlugins(flutter::PluginRegistry* registry) {
   SpeechToTextWindowsRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("SpeechToTextWindows"));
 }
-
-// Unit 133 by DhanujaAnbalagan

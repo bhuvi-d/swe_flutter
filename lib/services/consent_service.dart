@@ -53,5 +53,10 @@ class ConsentService {
 
   /// Clears all consent and guest mode data.
   Future<void> clear() async {
-
-// Unit 164 by bhuvi-d
+    final p = await prefs;
+    await p.remove(_consentKey);
+    await p.remove(_guestModeKey);
+  }
+}
+/// Global singleton instance
+final consentService = ConsentService();
