@@ -58,5 +58,6 @@ class ConsentService {
     await p.remove(_guestModeKey);
   }
 }
-/// Global singleton instance
+
+/// Global singleton instance of [ConsentService].
 final consentService = ConsentService();

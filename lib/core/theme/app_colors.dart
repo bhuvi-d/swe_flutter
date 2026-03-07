@@ -145,5 +145,3 @@ class AppColors {
   static const Color amber800 = Color(0xFF92400E);
   static const Color amber900 = Color(0xFF78350F);
 }
-
-// Unit 122 by Akshith1413

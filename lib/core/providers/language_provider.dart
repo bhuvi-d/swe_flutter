@@ -122,5 +122,3 @@ class LanguageProvider extends ChangeNotifier {
     }).toList();
   }
 }
-
-// Unit 5 by Akshith1413

@@ -44,7 +44,3 @@ class AppConstants {
   static const String baseApiUrl = 'https://your-api-url.com';
   static const Duration apiTimeout = Duration(seconds: 30);
 }
-
-// Unit 63 by bhuvi-d
-
-// Unit 152 by Akshith1413

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
 import '../core/localization/translation_service.dart';
 import '../services/consent_service.dart';
-import '../services/offline_storage_service.dart';
 
 /// HomeView - Main app home screen with action grid.
 /// 
@@ -30,14 +29,11 @@ class HomeView extends StatefulWidget {
 
 class _HomeViewState extends State<HomeView> {
   bool _isGuest = false;
-  int _pendingSyncCount = 0; // US15: Pending offline sync count
-
 
   @override
   void initState() {
     super.initState();
     _checkGuestMode();
-    _loadPendingSyncCount();
   }
 
   /// Checks if the user is in guest mode to display the banner.
@@ -47,14 +43,6 @@ class _HomeViewState extends State<HomeView> {
       setState(() {
         _isGuest = isGuest;
       });
-    }
-  }
-
-  /// US15: Loads the count of pending offline media items.
-  Future<void> _loadPendingSyncCount() async {
-    final count = await offlineStorageService.getPendingCount();
-    if (mounted) {
-      setState(() => _pendingSyncCount = count);
     }
   }
 
@@ -84,7 +72,7 @@ class _HomeViewState extends State<HomeView> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header
               _buildHeader(context),
@@ -182,61 +170,53 @@ class _HomeViewState extends State<HomeView> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Expanded(
-          child: Row(
-            children: [
-              // App Icon
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF10B981), Color(0xFF059669)],
+        Row(
+          children: [
+            // App Icon
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF10B981), Color(0xFF059669)],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF10B981).withOpacity(0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
                   ),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF10B981).withOpacity(0.3),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.eco,
-                  size: 28,
-                  color: Colors.white,
-                ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${context.t(_getGreetingKey())},',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.gray500,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(
-                      context.t('homeView.userTitle'),
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        color: AppColors.gray800,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
+              child: const Icon(
+                Icons.eco,
+                size: 28,
+                color: Colors.white,
               ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${context.t(_getGreetingKey())},',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.gray500,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                Text(
+                  context.t('homeView.userTitle'),
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    color: AppColors.gray800,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
         Row(
           children: [
@@ -739,15 +719,6 @@ class _HomeViewState extends State<HomeView> {
           widget.isOnline ? context.t('homeView.status.online') : context.t('homeView.status.offline'),
         ),
         const SizedBox(width: 24),
-        // US15: Offline sync indicator
-        if (_pendingSyncCount > 0)
-          _buildStatusItem(
-            AppColors.amber600,
-            '$_pendingSyncCount pending',
-            icon: Icons.cloud_upload,
-          ),
-        if (_pendingSyncCount > 0)
-          const SizedBox(width: 24),
         _buildStatusItem(
           AppColors.gray500,
           context.t('homeView.status.mobile'),

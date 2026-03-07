@@ -226,5 +226,3 @@ class _MediaGalleryState extends State<MediaGallery> {
     return null;
   }
 }
-
-// Trace update 112

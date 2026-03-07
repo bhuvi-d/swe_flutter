@@ -48,6 +48,7 @@ dependencies:
   intl: ^0.20.2
 
   # Utilities
+  url_launcher: ^6.2.5
   google_fonts: ^6.2.1
   cached_network_image: ^3.4.1
   image: ^4.2.0

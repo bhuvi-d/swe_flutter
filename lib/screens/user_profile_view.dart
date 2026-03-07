@@ -298,7 +298,3 @@ class _UserProfileViewState extends State<UserProfileView> {
     return Divider(height: 1, indent: 68, color: AppColors.gray100);
   }
 }
-
-// Unit 29 by Akshith1413
-
-// Trace update 160

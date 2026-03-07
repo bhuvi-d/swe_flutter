@@ -187,7 +187,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'CropAId 🌾',
+                    'CropAid 🌾',
                     style: TextStyle(
                       fontSize: 48,
                       fontWeight: FontWeight.bold,
@@ -242,7 +242,7 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 // Brand Info
                 const Text(
-                  'CropAId 🌾',
+                  'CropAid 🌾',
                   style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
@@ -443,7 +443,3 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
-
-// Unit 1 by DhanujaAnbalagan
-
-// Unit 71 by Akshith1413

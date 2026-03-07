@@ -92,7 +92,3 @@ class ImageQualityUtil {
     );
   }
 }
-
-// Unit 70 by Akshith1413
-
-// Trace update 32

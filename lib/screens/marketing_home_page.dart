@@ -187,7 +187,7 @@ class _MarketingHomePageState extends State<MarketingHomePage> {
           fontSize: isDesktop ? 72 : 48,
           fontWeight: FontWeight.w800,
           height: 1.1,
-          color: Colors.white,
+          color: Colors.transparent,
           shadows: [
             Shadow(
               color: AppColors.accentGreen.withOpacity(0.5),
@@ -546,7 +546,3 @@ extension GradientText on Text {
     );
   }
 }
-
-// Unit 34 by Akshith1413
-
-// Trace update 140

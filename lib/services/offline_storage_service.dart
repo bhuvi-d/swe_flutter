@@ -158,5 +158,4 @@ class SyncResult {
   });
 }
 
-/// Global singleton instance
 final offlineStorageService = OfflineStorageService();

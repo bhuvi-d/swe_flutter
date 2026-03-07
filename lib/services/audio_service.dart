@@ -132,16 +132,6 @@ class AudioService {
     }
   }
 
-  /// Plays a click sound effect.
-  Future<void> playClick() async {
-    await playSound('click');
-  }
-
-  /// Plays a success sound effect.
-  Future<void> playSuccess() async {
-    await playSound('success');
-  }
-
   /// Disposes of audio resources.
   Future<void> dispose() async {
     await _tts.stop();
@@ -151,9 +141,3 @@ class AudioService {
 
 /// Global singleton instance of [AudioService].
 final audioService = AudioService();
-
-// Unit 20 by Akshith1413
-
-// Unit 80 by Akshith1413
-
-// Trace update 156

@@ -1,12 +1,12 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
-import 'package:lucide_icons/lucide_icons.dart';
 import '../core/theme/app_colors.dart';
 import '../services/audio_service.dart';
 import '../core/localization/translation_service.dart';
 
-/// Voice Doctor View - A premium voice AI interface matching React's sophisticated UI.
+/// Voice Doctor View - A voice-enabled AI interface for symptom diagnosis
+/// US14: Voice input for symptom description with language selection
+/// US16: Confirmation of captured input
 class VoiceDoctorView extends StatefulWidget {
   final VoidCallback? onBack;
 
@@ -19,25 +19,27 @@ class VoiceDoctorView extends StatefulWidget {
   State<VoiceDoctorView> createState() => _VoiceDoctorViewState();
 }
 
-class _VoiceDoctorViewState extends State<VoiceDoctorView> with TickerProviderStateMixin {
+class _VoiceDoctorViewState extends State<VoiceDoctorView> with SingleTickerProviderStateMixin {
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isListening = false;
   String _transcript = '';
   String _response = '';
   bool _isAnalyzing = false;
   bool _isInitialized = false;
-  
-  // Animation Controllers
   late AnimationController _pulseController;
-  late AnimationController _waveController;
 
-  // US14: Language selection
+  // US14: Language selection for STT
   String _selectedLocale = 'en_US';
+  List<stt.LocaleName> _availableLocales = [];
+
   final Map<String, String> _localeOptions = {
     'en_US': 'English',
     'hi_IN': 'Hindi',
     'te_IN': 'Telugu',
     'ta_IN': 'Tamil',
+    'kn_IN': 'Kannada',
+    'mr_IN': 'Marathi',
+    'bn_IN': 'Bengali',
   };
 
   @override
@@ -47,12 +49,6 @@ class _VoiceDoctorViewState extends State<VoiceDoctorView> with TickerProviderSt
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
-    
-    _waveController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    )..repeat(reverse: true);
-
     _initSpeech();
   }
 
@@ -64,9 +60,25 @@ class _VoiceDoctorViewState extends State<VoiceDoctorView> with TickerProviderSt
             if (mounted) setState(() => _isListening = false);
           }
         },
-        onError: (error) => debugPrint('STT Error: $error'),
+        onError: (error) {
+          debugPrint('STT Error: $error');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Speech error: ${error.errorMsg}')),
+            );
+          }
+        },
       );
-      if (mounted) setState(() => _isInitialized = available);
+
+      if (available) {
+        final locales = await _speech.locales();
+        if (mounted) {
+          setState(() {
+            _isInitialized = true;
+            _availableLocales = locales;
+          });
+        }
+      }
     } catch (e) {
       debugPrint('STT Init Error: $e');
     }
@@ -75,25 +87,31 @@ class _VoiceDoctorViewState extends State<VoiceDoctorView> with TickerProviderSt
   @override
   void dispose() {
     _pulseController.dispose();
-    _waveController.dispose();
     _speech.stop();
     super.dispose();
   }
 
+  /// US14: Toggle listening with selected language
   void _toggleListening() async {
     if (_isListening) {
       await _speech.stop();
       setState(() => _isListening = false);
-      if (_transcript.isNotEmpty) _analyzeSymptoms();
+      if (_transcript.isNotEmpty) {
+        _analyzeSymptoms();
+      }
     } else {
-      if (!_isInitialized) return;
-      
+      if (!_isInitialized) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Speech recognition not available')),
+        );
+        return;
+      }
+
       setState(() {
         _isListening = true;
         _transcript = '';
         _response = '';
       });
-      audioService.playClick();
 
       await _speech.listen(
         onResult: (result) {
@@ -102,222 +120,314 @@ class _VoiceDoctorViewState extends State<VoiceDoctorView> with TickerProviderSt
           });
         },
         localeId: _selectedLocale,
+        listenFor: const Duration(seconds: 30),
+        pauseFor: const Duration(seconds: 3),
       );
     }
   }
 
   void _analyzeSymptoms() async {
     setState(() => _isAnalyzing = true);
+
+    // Simulate AI analysis
     await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-    
-    setState(() {
-      _isAnalyzing = false;
-      _response = _generateResponse(_transcript);
-    });
-    audioService.confirmAction('success');
-    audioService.speak(_response);
+
+    if (mounted) {
+      setState(() {
+        _isAnalyzing = false;
+        _response = _generateResponse(_transcript);
+      });
+
+      // US16: Voice confirmation of result
+      audioService.confirmAction('success');
+      audioService.speak(_response);
+    }
   }
 
   String _generateResponse(String symptoms) {
-    if (symptoms.toLowerCase().contains('yellow')) {
-      return "Based on your description of yellowing leaves, I recommend checking for nutrient deficiency. Ensure proper fertilization and irrigation.";
+    final lowerSymptoms = symptoms.toLowerCase();
+    
+    if (lowerSymptoms.contains('yellow') || lowerSymptoms.contains('पीला')) {
+      return "Based on your description, this appears to be a nutrient deficiency or possible fungal infection causing yellowing leaves. Recommended: Apply nitrogen-rich fertilizer and check soil pH.";
+    } else if (lowerSymptoms.contains('spot') || lowerSymptoms.contains('धब्बे')) {
+      return "The spots you're describing could indicate a fungal disease like Leaf Spot. Recommended: Remove affected leaves, improve air circulation, and apply fungicide if needed.";
+    } else if (lowerSymptoms.contains('wilt') || lowerSymptoms.contains('मुर्झाना')) {
+      return "Wilting symptoms suggest possible root problems or water stress. Recommended: Check for root rot, ensure proper drainage, and water consistently.";
+    } else {
+      return "Based on your description of '$symptoms', I recommend capturing a photo for more accurate diagnosis. Common causes include pest damage, environmental stress, or nutrient imbalance.";
     }
-    return "I've analyzed your description. It sounds like potential environmental stress. Try capturing a photo for a more precise diagnosis.";
+  }
+
+  void _clearAndRetry() {
+    setState(() {
+      _transcript = '';
+      _response = '';
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC), // Cool gray background
-      body: Column(
-        children: [
-          // 1. Premium Header
-          _buildHeader(),
+      appBar: AppBar(
+        title: Text(context.t('voiceView.title')),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: widget.onBack ?? () => Navigator.pop(context),
+        ),
+        foregroundColor: AppColors.nature700,
+      ),
+      extendBodyBehindAppBar: true,
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [AppColors.nature50, Color(0xFFD1FAE5)],
+          ),
+        ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                // US14: Language Selection Dropdown
+                _buildLanguageSelector(),
 
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                children: [
-                  // 2. Main Mic Card (Glassmorphism inspired)
-                  _buildMicCard(),
+                const SizedBox(height: 30),
 
-                  const SizedBox(height: 24),
+                // Pulsing Mic Button
+                _buildMicButton(),
 
-                  // 3. Example Questions (Matching React)
-                  if (_transcript.isEmpty && _response.isEmpty) _buildExamples(),
+                const SizedBox(height: 20),
 
-                  // 4. Analysis Results
-                  if (_isAnalyzing) const CircularProgressIndicator(color: AppColors.nature600),
-                  if (_response.isNotEmpty) _buildResponseCard(),
+                // Status Text
+                Text(
+                  _isListening
+                      ? context.t('voiceView.listening')
+                      : (_isInitialized
+                          ? context.t('voiceView.tapToSpeak')
+                          : 'Initializing...'),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: _isListening ? AppColors.nature600 : AppColors.gray600,
+                  ),
+                ),
+
+                const SizedBox(height: 40),
+
+                // Transcript Card
+                if (_transcript.isNotEmpty) _buildTranscriptCard(),
+
+                // AI Response Card
+                if (_isAnalyzing)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 30),
+                    child: CircularProgressIndicator(),
+                  )
+                else if (_response.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  _buildResponseCard(),
+                  const SizedBox(height: 20),
+                  ElevatedButton.icon(
+                    onPressed: _clearAndRetry,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Ask Again'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.nature600,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
                 ],
-              ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildHeader() {
+  /// US14: Language selection dropdown
+  Widget _buildLanguageSelector() {
     return Container(
-      padding: const EdgeInsets.only(top: 50, bottom: 20, left: 16, right: 16),
-      decoration: const BoxDecoration(
-        color: Color(0xFF059669), // Emerald 600
-        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)],
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+          ),
+        ],
       ),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(LucideIcons.chevronLeft, color: Colors.white),
-            onPressed: widget.onBack ?? () => Navigator.pop(context),
+          Icon(Icons.language, color: AppColors.nature600),
+          const SizedBox(width: 12),
+          Text('Language:', style: TextStyle(color: AppColors.gray600)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: DropdownButton<String>(
+              value: _selectedLocale,
+              isExpanded: true,
+              underline: const SizedBox(),
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() => _selectedLocale = value);
+                }
+              },
+              items: _localeOptions.entries.map((entry) {
+                return DropdownMenuItem(
+                  value: entry.key,
+                  child: Text(entry.value),
+                );
+              }).toList(),
+            ),
           ),
-          const SizedBox(width: 8),
-          Text(context.t('voiceView.title'), style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
         ],
       ),
     );
   }
 
-  Widget _buildMicCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(40),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(32),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, 10)),
-        ],
-        border: Border.all(color: const Color(0xFFECFDF5)),
-      ),
-      child: Column(
-        children: [
-          // Pulsing Mic Button
-          GestureDetector(
-            onTap: _toggleListening,
-            child: AnimatedBuilder(
-              animation: _pulseController,
-              builder: (context, child) {
-                final scale = _isListening ? (1.0 + 0.1 * _pulseController.value) : 1.0;
-                return Transform.scale(
-                  scale: scale,
-                  child: Container(
-                    width: 100, height: 100,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: _isListening ? const Color(0xFFEF4444) : const Color(0xFF10B981),
-                      boxShadow: [
-                        BoxShadow(
-                          color: (_isListening ? Colors.red : const Color(0xFF10B981)).withOpacity(0.3),
-                          blurRadius: 20,
-                          spreadRadius: 5,
-                        ),
-                      ],
-                    ),
-                    child: Icon(_isListening ? LucideIcons.square : LucideIcons.mic, color: Colors.white, size: 40),
+  Widget _buildMicButton() {
+    return GestureDetector(
+      onTap: _toggleListening,
+      child: AnimatedBuilder(
+        animation: _pulseController,
+        builder: (context, child) {
+          final scale = _isListening ? (1.0 + 0.1 * _pulseController.value) : 1.0;
+          return Transform.scale(
+            scale: scale,
+            child: Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: _isListening
+                      ? [AppColors.red400, AppColors.red600]
+                      : [AppColors.nature400, AppColors.nature600],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: (_isListening ? AppColors.red500 : AppColors.nature500)
+                        .withOpacity(0.4),
+                    blurRadius: 25,
+                    offset: const Offset(0, 10),
                   ),
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            _isListening ? context.t('voiceView.listening') : context.t('voiceView.tapToSpeak'),
-            style: const TextStyle(fontSize: 18, color: Color(0xFF475569), fontWeight: FontWeight.w500),
-          ),
-
-          // Voice Waves (React style)
-          if (_isListening)
-            Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(5, (index) => _buildWaveBar(index)),
+                ],
+              ),
+              child: Icon(
+                _isListening ? Icons.stop : Icons.mic,
+                size: 48,
+                color: Colors.white,
               ),
             ),
-
-          // Transcript
-          if (_transcript.isNotEmpty)
-            Container(
-              margin: const EdgeInsets.only(top: 24),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(16)),
-              child: Text(_transcript, style: const TextStyle(color: Color(0xFF1E293B), fontSize: 16)),
-            ),
-        ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildWaveBar(int index) {
-    return AnimatedBuilder(
-      animation: _waveController,
-      builder: (context, child) {
-        final height = 12 + (math.sin(_waveController.value * 6.28 + (index * 0.5)) * 10).abs();
-        return Container(
-          width: 4,
-          height: height,
-          margin: const EdgeInsets.symmetric(horizontal: 2),
-          decoration: BoxDecoration(color: const Color(0xFFF87171), borderRadius: BorderRadius.circular(2)),
-        );
-      },
-    );
-  }
-
-  Widget _buildExamples() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text("Try asking:", style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
-        _exampleItem("My tomato leaves are turning yellow with brown spots."),
-        _exampleItem("There are white powdery patches on my plant."),
-        _exampleItem("The stems of my potato plant are wilting."),
-      ],
-    );
-  }
-
-  Widget _exampleItem(String text) {
+  Widget _buildTranscriptCard() {
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFF1F5F9)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 15,
+          ),
+        ],
       ),
-      child: Text('"$text"', style: const TextStyle(color: Color(0xFF64748B), fontSize: 14, fontStyle: FontStyle.italic)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.person, color: AppColors.purple500, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                context.t('voiceView.youSaid'),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.purple600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            _transcript,
+            style: TextStyle(
+              fontSize: 16,
+              color: AppColors.gray700,
+              height: 1.5,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildResponseCard() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFFECFDF5),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFD1FAE5)),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.nature100, Colors.white],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.nature200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(LucideIcons.sparkles, color: Color(0xFF059669), size: 18),
-              SizedBox(width: 8),
-              Text("AI Doctor Analysis", style: TextStyle(color: Color(0xFF065F46), fontWeight: FontWeight.bold)),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.nature500,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.eco, size: 20, color: Colors.white),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                context.t('voiceView.aiDoctor'),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: AppColors.nature700,
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 12),
-          Text(_response, style: const TextStyle(color: Color(0xFF047857), fontSize: 15, height: 1.5)),
+          const SizedBox(height: 16),
+          Text(
+            _response,
+            style: TextStyle(
+              fontSize: 15,
+              color: AppColors.gray700,
+              height: 1.6,
+            ),
+          ),
         ],
       ),
     );
   }
 }
-
-// Trace update 12

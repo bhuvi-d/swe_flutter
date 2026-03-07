@@ -298,7 +298,3 @@ class AppTheme {
     );
   }
 }
-
-// Unit 12 by bhuvi-d
-
-// Unit 24 by Rama-Roshinee06
