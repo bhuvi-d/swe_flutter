@@ -5,6 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../core/theme/app_colors.dart';
 import '../models/analysis_result.dart';
+import '../services/preferences_service.dart';
+import '../services/tts_service.dart';
+import '../services/translation_service.dart';
 
 /// A sophisticated advice card matching the React application's high-end UI.
 /// Replicates the 'ImageAnalysis' component with a dark, premium aesthetic.
@@ -24,6 +27,36 @@ class CropAdviceCard extends StatefulWidget {
 
 class _CropAdviceCardState extends State<CropAdviceCard> {
   bool _copied = false;
+  List<String> _translatedSteps = [];
+  String _targetLanguage = 'en-US';
+  bool _isTranslating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeTranslations();
+  }
+
+  Future<void> _initializeTranslations() async {
+    setState(() => _isTranslating = true);
+    
+    _targetLanguage = await preferencesService.getLanguage() ?? 'en-US';
+    
+    if (_targetLanguage.startsWith('en')) {
+      _translatedSteps = List.from(widget.result.treatmentSteps);
+    } else {
+      final List<String> translated = [];
+      for (final step in widget.result.treatmentSteps) {
+        final t = await TranslationService.translate(step, _targetLanguage);
+        translated.add(t);
+      }
+      _translatedSteps = translated;
+    }
+
+    if (mounted) {
+      setState(() => _isTranslating = false);
+    }
+  }
 
   void _handleCopy() {
     final text = '''
@@ -162,7 +195,31 @@ Analysis: ${widget.result.cause}
                   const SizedBox(height: 24),
 
                   // Treatment Section
-                  _buildSectionTitle(LucideIcons.checkCircle, 'Recommended Actions', const Color(0xFF10B981)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildSectionTitle(LucideIcons.checkCircle, 'Recommended Actions', const Color(0xFF10B981)),
+                      TextButton.icon(
+                        onPressed: _isTranslating ? null : () {
+                          TTSService.speakSteps(_translatedSteps, _targetLanguage);
+                        },
+                        icon: Icon(
+                          _isTranslating ? Icons.hourglass_empty : Icons.volume_up, 
+                          size: 20, 
+                          color: const Color(0xFF10B981)
+                        ),
+                        label: Text(
+                          _isTranslating ? 'Translating...' : 'Play Instructions',
+                          style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold),
+                        ),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          backgroundColor: const Color(0xFF10B981).withOpacity(0.1),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                    ],
+                  ),
                   _buildTreatmentList(),
 
                   const SizedBox(height: 32),
@@ -308,32 +365,61 @@ Analysis: ${widget.result.cause}
   }
 
   Widget _buildTreatmentList() {
-    final actions = [widget.result.immediate, widget.result.chemical, widget.result.organic, widget.result.prevention];
+    final steps = _translatedSteps.isEmpty ? widget.result.treatmentSteps : _translatedSteps;
+    
+    if (steps.isEmpty) {
+      return _buildGlassInfoCard('No specific treatment steps available.', icon: Icons.info_outline, iconColor: Colors.blueAccent);
+    }
+
     return Column(
-      children: actions.map((action) => Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFF10B981).withOpacity(0.03),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF10B981).withOpacity(0.08)),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(Icons.check_circle_outline, color: const Color(0xFF10B981), size: 20),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  action,
-                  style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+      children: List.generate(steps.length, (index) {
+        final stepNumber = index + 1;
+        final stepText = steps[index];
+
+        return GestureDetector(
+          onTap: () {
+            TTSService.speakText(stepText, _targetLanguage);
+          },
+          child: Container(
+            margin: const EdgeInsets.symmetric(vertical: 6),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.blueGrey.shade900,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white.withOpacity(0.05)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                CircleAvatar(
+                  radius: 14,
+                  backgroundColor: Colors.green,
+                  child: Text(
+                    "$stepNumber",
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    stepText,
+                    style: TextStyle(
+                      color: _isTranslating ? Colors.white38 : Colors.white,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(Icons.volume_up, size: 18, color: Colors.white24),
+              ],
+            ),
           ),
-        ),
-      )).toList(),
+        );
+      }),
     );
   }
 

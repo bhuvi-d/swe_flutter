@@ -62,6 +62,14 @@ class CropAdviceService {
           chemical: data['chemical'] ?? 'Consult local agricultural expert',
           organic: data['organic'] ?? 'Use neem-based solutions',
           prevention: data['prevention'] ?? 'Maintain proper crop hygiene',
+          treatmentSteps: data['treatmentSteps'] != null 
+              ? List<String>.from(data['treatmentSteps'] as List) 
+              : [
+                  data['immediate'] ?? 'Remove affected parts immediately',
+                  data['chemical'] ?? 'Consult local agricultural expert',
+                  data['organic'] ?? 'Use neem-based solutions',
+                  data['prevention'] ?? 'Maintain proper crop hygiene'
+                ],
         );
       } else {
         // Return mock data if API fails (for demo purposes)
@@ -94,6 +102,13 @@ class CropAdviceService {
       chemical: 'Fungicides containing chlorothalonil or copper-based sprays are generally effective if applied early enough. Always follow local agricultural guidelines.',
       organic: 'Regular applications of neem oil or potassium bicarbonate can help suppress the disease. Ensure the soil has good drainage and adequate nutrients.',
       prevention: 'Rotate crops annually. Use resistant varieties if available. Sterilize tools after each use to prevent spreading pathogens across the farm.',
+      treatmentSteps: [
+        "Remove and destroy all infected leaves immediately.",
+        "Improve air circulation around plants by pruning.",
+        "Apply fungicide spray every 7-10 days if symptoms persist.",
+        "Monitor plants regularly for new spots and overall health.",
+        "Sterilize all gardening tools after use."
+      ],
     );
   }
 }

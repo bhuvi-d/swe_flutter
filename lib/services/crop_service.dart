@@ -157,6 +157,14 @@ class CropService {
       prevention: isHealthy
           ? 'Ensure proper watering and spacing.'
           : 'Rotate crops every 2-3 years. Mulch to prevent soil splash. Water at the base of the plant.',
+      treatmentSteps: isHealthy 
+          ? ["Continue regular care routine.", "Ensure proper watering and spacing."]
+          : [
+              "Remove infected leaves immediately.",
+              "Improve air circulation around plants.",
+              "Apply fungicide spray every 7-10 days.",
+              "Monitor plants regularly for new spots."
+            ],
     );
 
     // Save to history
