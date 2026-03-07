@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/analysis_result.dart';
 
+import '../core/constants/app_constants.dart';
+
 /// Service for retrieving crop advice from the backend LLM.
 /// 
 /// This service handles:
@@ -9,7 +11,7 @@ import '../models/analysis_result.dart';
 /// - Parsing the AI-generated advice (cause, symptoms, treatment).
 /// - Providing mock advice when offline or if the API fails.
 class CropAdviceService {
-  static const String baseUrl = 'https://crop-aid-backend.onrender.com';
+  static String get baseUrl => AppConstants.baseApiUrl;
 
   /// Fetches AI-generated advice for a specific crop disease.
   /// 
@@ -84,6 +86,22 @@ class CropAdviceService {
                   "Use copper-based fungicide spray",
                   "Repeat treatment every 7–10 days"
                 ],
+          recoveryTimeline: data['recoveryTimeline'] != null
+              ? Map<String, dynamic>.from(data['recoveryTimeline'])
+              : {
+                  'initialDays': '3-5',
+                  'fullRecoveryDays': '14-21',
+                  'monitoringDays': '30',
+                  'description': 'Recovery times vary based on disease severity and treatment adherence.'
+                },
+          preventionChecklist: data['preventionChecklist'] != null
+              ? List<String>.from(data['preventionChecklist'] as List)
+              : [
+                  'Remove and destroy infected plant debris',
+                  'Ensure proper spacing between plants for airflow',
+                  'Rotate crops each season to prevent soil-borne pathogens',
+                  'Monitor plants weekly for early signs of disease',
+                ],
         );
       } else {
         // Return mock data if API fails (for demo purposes)
@@ -132,6 +150,18 @@ class CropAdviceService {
         "Apply chlorothalonil fungicide",
         "Use copper-based fungicide spray",
         "Repeat treatment every 7–10 days"
+      ],
+      recoveryTimeline: {
+        'initialDays': '3-5',
+        'fullRecoveryDays': '14-21',
+        'monitoringDays': '30',
+        'description': 'Initial improvement: 3-5 days | Full recovery: 14-21 days | Monitoring period: 30 days'
+      },
+      preventionChecklist: [
+        'Remove and destroy infected plant debris after each harvest',
+        'Ensure proper spacing between plants for adequate airflow',
+        'Rotate crops each season to break disease cycles',
+        'Monitor plants weekly for early signs of disease',
       ],
     );
   }

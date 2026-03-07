@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
-import '../core/theme/app_colors.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+import '../core/utils/responsive_layout.dart';
 import '../services/chat_service.dart';
 
-/// In-app chatbot for farming questions.
-/// Opens as a modal - users ask questions and get AI-powered farming advice.
+/// In-app chatbot for farming questions — premium dark theme.
+///
+/// Users ask questions and get AI-powered farming advice.
 class ChatbotView extends StatefulWidget {
   final VoidCallback onClose;
 
-  const ChatbotView({
-    super.key,
-    required this.onClose,
-  });
+  const ChatbotView({super.key, required this.onClose});
 
   @override
   State<ChatbotView> createState() => _ChatbotViewState();
@@ -48,7 +47,6 @@ class _ChatbotViewState extends State<ChatbotView> {
       _messages.add(_ChatMessage(text: text, isUser: true, timestamp: DateTime.now()));
       _isLoading = true;
     });
-
     _scrollToBottom();
 
     try {
@@ -69,7 +67,6 @@ class _ChatbotViewState extends State<ChatbotView> {
         _isLoading = false;
       });
     }
-
     _scrollToBottom();
   }
 
@@ -88,9 +85,9 @@ class _ChatbotViewState extends State<ChatbotView> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.9,
+      height: MediaQuery.of(context).size.height * 0.92,
       decoration: const BoxDecoration(
-        color: Colors.white,
+        color: Color(0xFF0F1A2E),
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(24),
           topRight: Radius.circular(24),
@@ -100,16 +97,19 @@ class _ChatbotViewState extends State<ChatbotView> {
         children: [
           _buildHeader(),
           Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              itemCount: _messages.length + (_isLoading ? 1 : 0),
-              itemBuilder: (context, index) {
-                if (index == _messages.length) {
-                  return _buildTypingIndicator();
-                }
-                return _buildMessage(_messages[index]);
-              },
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: responsiveMaxWidth(context)),
+                child: ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  itemCount: _messages.length + (_isLoading ? 1 : 0),
+                  itemBuilder: (context, index) {
+                    if (index == _messages.length) return _buildTypingIndicator();
+                    return _buildMessage(_messages[index]);
+                  },
+                ),
+              ),
             ),
           ),
           _buildInput(),
@@ -120,14 +120,14 @@ class _ChatbotViewState extends State<ChatbotView> {
 
   Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF10B981), Color(0xFF16A34A)],
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF10B981), Color(0xFF059669)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: const BorderRadius.only(
+        borderRadius: BorderRadius.only(
           topLeft: Radius.circular(24),
           topRight: Radius.circular(24),
         ),
@@ -142,34 +142,40 @@ class _ChatbotViewState extends State<ChatbotView> {
                 color: Colors.white.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.chat, color: Colors.white, size: 24),
+              child: const Icon(LucideIcons.bot, color: Colors.white, size: 22),
             ),
             const SizedBox(width: 12),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    "CropAID Assistant",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  const Text(
+                    'CropAID Assistant',
+                    style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
                   ),
-                  Text(
-                    "Smart Farming Support",
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 12,
-                    ),
+                  Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF86EFAC),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'Online • Smart Farming Support',
+                        style: TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
             IconButton(
               onPressed: widget.onClose,
-              icon: const Icon(Icons.close, color: Colors.white),
+              icon: const Icon(Icons.close_rounded, color: Colors.white),
             ),
           ],
         ),
@@ -178,30 +184,32 @@ class _ChatbotViewState extends State<ChatbotView> {
   }
 
   Widget _buildMessage(_ChatMessage msg) {
+    final maxBubbleWidth = MediaQuery.of(context).size.width >= Breakpoints.tablet ? 500.0 : MediaQuery.of(context).size.width * 0.78;
+
     return Align(
       alignment: msg.isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.8),
+        constraints: BoxConstraints(maxWidth: maxBubbleWidth),
         decoration: BoxDecoration(
           color: msg.isUser
-              ? AppColors.nature600
-              : AppColors.nature50,
+              ? const Color(0xFF10B981)
+              : Colors.white.withOpacity(0.07),
           borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(16),
-            topRight: const Radius.circular(16),
-            bottomLeft: Radius.circular(msg.isUser ? 16 : 4),
-            bottomRight: Radius.circular(msg.isUser ? 4 : 16),
+            topLeft: const Radius.circular(18),
+            topRight: const Radius.circular(18),
+            bottomLeft: Radius.circular(msg.isUser ? 18 : 4),
+            bottomRight: Radius.circular(msg.isUser ? 4 : 18),
           ),
-          border: msg.isUser ? null : Border.all(color: AppColors.nature200),
+          border: msg.isUser ? null : Border.all(color: Colors.white.withOpacity(0.08)),
         ),
         child: Text(
           msg.text,
           style: TextStyle(
-            fontSize: 15,
-            color: msg.isUser ? Colors.white : AppColors.gray800,
-            height: 1.4,
+            fontSize: 14,
+            color: msg.isUser ? Colors.white : Colors.white.withOpacity(0.85),
+            height: 1.45,
           ),
         ),
       ),
@@ -215,16 +223,16 @@ class _ChatbotViewState extends State<ChatbotView> {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: AppColors.nature50,
+          color: Colors.white.withOpacity(0.07),
           borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(16),
-            topRight: Radius.circular(16),
+            topLeft: Radius.circular(18),
+            topRight: Radius.circular(18),
             bottomLeft: Radius.circular(4),
-            bottomRight: Radius.circular(16),
+            bottomRight: Radius.circular(18),
           ),
-          border: Border.all(color: AppColors.nature200),
+          border: Border.all(color: Colors.white.withOpacity(0.08)),
         ),
-        child: _TypingDots(),
+        child: const _TypingDots(),
       ),
     );
   }
@@ -232,50 +240,61 @@ class _ChatbotViewState extends State<ChatbotView> {
   Widget _buildInput() {
     return Container(
       padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 12,
+        left: 16, right: 16, top: 12,
         bottom: MediaQuery.of(context).padding.bottom + 12,
       ),
       decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
-          ),
-        ],
+        color: Colors.white.withOpacity(0.04),
+        border: Border(top: BorderSide(color: Colors.white.withOpacity(0.06))),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _controller,
-              decoration: InputDecoration(
-                hintText: "Ask about crops, diseases, farming...",
-                hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 15),
-                filled: true,
-                fillColor: AppColors.gray100,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide.none,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: responsiveMaxWidth(context)),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _controller,
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText: 'Ask about crops, diseases, farming...',
+                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 14),
+                    filled: true,
+                    fillColor: Colors.white.withOpacity(0.06),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(24),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  ),
+                  onSubmitted: (_) => _sendMessage(),
+                  enabled: !_isLoading,
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               ),
-              onSubmitted: (_) => _sendMessage(),
-              enabled: !_isLoading,
-            ),
+              const SizedBox(width: 12),
+              GestureDetector(
+                onTap: _isLoading ? null : _sendMessage,
+                child: Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF10B981), Color(0xFF059669)],
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF10B981).withOpacity(0.3),
+                        blurRadius: 10,
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          CircleAvatar(
-            backgroundColor: AppColors.nature600,
-            child: IconButton(
-              onPressed: _isLoading ? null : _sendMessage,
-              icon: const Icon(Icons.send, color: Colors.white, size: 22),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -286,20 +305,17 @@ class _ChatMessage {
   final bool isUser;
   final DateTime timestamp;
 
-  _ChatMessage({
-    required this.text,
-    required this.isUser,
-    required this.timestamp,
-  });
+  _ChatMessage({required this.text, required this.isUser, required this.timestamp});
 }
 
 class _TypingDots extends StatefulWidget {
+  const _TypingDots();
+
   @override
   State<_TypingDots> createState() => _TypingDotsState();
 }
 
-class _TypingDotsState extends State<_TypingDots>
-    with SingleTickerProviderStateMixin {
+class _TypingDotsState extends State<_TypingDots> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
 
   @override
@@ -326,14 +342,14 @@ class _TypingDotsState extends State<_TypingDots>
           animation: _controller,
           builder: (context, child) {
             final t = (_controller.value + i * 0.33) % 1.0;
-            final opacity = 0.4 + 0.6 * (1 - (t - 0.5).abs() * 2).clamp(0.0, 1.0);
+            final opacity = 0.3 + 0.7 * (1 - (t - 0.5).abs() * 2).clamp(0.0, 1.0);
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 3),
               child: Container(
                 width: 8,
                 height: 8,
                 decoration: BoxDecoration(
-                  color: AppColors.nature600.withOpacity(opacity),
+                  color: const Color(0xFF10B981).withOpacity(opacity),
                   shape: BoxShape.circle,
                 ),
               ),

@@ -1,4 +1,3 @@
-import 'dart:convert';
 
 /// Represents the result of a crop analysis.
 /// 
@@ -52,6 +51,32 @@ class AnalysisResult {
   /// Chemical treatment steps.
   final List<String> chemicalSteps;
 
+  // =============================================
+  // US17-20: Enhanced diagnosis fields
+  // =============================================
+
+  /// Top-N predictions from the model (US18).
+  final List<Map<String, dynamic>> topPredictions;
+
+  /// Base64-encoded Grad-CAM heatmap overlay image (US20).
+  final String? heatmapBase64;
+
+  /// Structured severity from the AI service (US19).
+  final String severityLevel;
+  final String severityDescription;
+
+  // =============================================
+  // US30-32: Recovery, Prevention, Feedback fields
+  // =============================================
+
+  /// Recovery timeline (US30).
+  /// { "initialDays": "3-5", "fullRecoveryDays": "14-21", "monitoringDays": "30", "description": "..." }
+  final Map<String, dynamic> recoveryTimeline;
+
+  /// Prevention checklist from AI (US31).
+  /// List of actionable prevention tips specific to the crop/disease.
+  final List<String> preventionChecklist;
+
   /// Creates an [AnalysisResult] instance.
   AnalysisResult({
     required this.id,
@@ -70,6 +95,12 @@ class AnalysisResult {
     required this.treatmentSteps,
     required this.organicSteps,
     required this.chemicalSteps,
+    this.topPredictions = const [],
+    this.heatmapBase64,
+    this.severityLevel = 'moderate',
+    this.severityDescription = '',
+    this.recoveryTimeline = const {},
+    this.preventionChecklist = const [],
   });
 
   /// Converts the [AnalysisResult] instance to a JSON map.
@@ -91,6 +122,12 @@ class AnalysisResult {
       'treatmentSteps': treatmentSteps,
       'organicSteps': organicSteps,
       'chemicalSteps': chemicalSteps,
+      'topPredictions': topPredictions,
+      'heatmapBase64': heatmapBase64,
+      'severityLevel': severityLevel,
+      'severityDescription': severityDescription,
+      'recoveryTimeline': recoveryTimeline,
+      'preventionChecklist': preventionChecklist,
     };
   }
 
@@ -119,6 +156,19 @@ class AnalysisResult {
       chemicalSteps: json['chemicalSteps'] != null
           ? List<String>.from(json['chemicalSteps'])
           : [],
+      topPredictions: json['topPredictions'] != null
+          ? List<Map<String, dynamic>>.from(
+              (json['topPredictions'] as List).map((e) => Map<String, dynamic>.from(e)))
+          : [],
+      heatmapBase64: json['heatmapBase64'],
+      severityLevel: json['severityLevel'] ?? 'moderate',
+      severityDescription: json['severityDescription'] ?? '',
+      recoveryTimeline: json['recoveryTimeline'] != null
+          ? Map<String, dynamic>.from(json['recoveryTimeline'])
+          : {},
+      preventionChecklist: json['preventionChecklist'] != null
+          ? List<String>.from(json['preventionChecklist'])
+          : [],
     );
   }
 
@@ -140,6 +190,12 @@ class AnalysisResult {
     List<String>? treatmentSteps,
     List<String>? organicSteps,
     List<String>? chemicalSteps,
+    List<Map<String, dynamic>>? topPredictions,
+    String? heatmapBase64,
+    String? severityLevel,
+    String? severityDescription,
+    Map<String, dynamic>? recoveryTimeline,
+    List<String>? preventionChecklist,
   }) {
     return AnalysisResult(
       id: id ?? this.id,
@@ -158,6 +214,12 @@ class AnalysisResult {
       treatmentSteps: treatmentSteps ?? this.treatmentSteps,
       organicSteps: organicSteps ?? this.organicSteps,
       chemicalSteps: chemicalSteps ?? this.chemicalSteps,
+      topPredictions: topPredictions ?? this.topPredictions,
+      heatmapBase64: heatmapBase64 ?? this.heatmapBase64,
+      severityLevel: severityLevel ?? this.severityLevel,
+      severityDescription: severityDescription ?? this.severityDescription,
+      recoveryTimeline: recoveryTimeline ?? this.recoveryTimeline,
+      preventionChecklist: preventionChecklist ?? this.preventionChecklist,
     );
   }
 }

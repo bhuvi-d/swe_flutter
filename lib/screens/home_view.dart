@@ -5,6 +5,7 @@ import '../services/consent_service.dart';
 import '../services/offline_storage_service.dart';
 import '../services/preferences_service.dart';
 import '../services/location_service.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import '../services/region_service.dart';
 
 /// HomeView - Main app home screen with action grid.
@@ -433,7 +434,7 @@ class _HomeViewState extends State<HomeView> {
               children: [
                 _buildActionCard(
                   context,
-                  icon: Icons.upload_file,
+                  icon: LucideIcons.uploadCloud,
                   label: context.t('homeView.actions.upload'),
                   color: AppColors.blue500,
                   bgColor: AppColors.blue100,
@@ -442,7 +443,7 @@ class _HomeViewState extends State<HomeView> {
                 ),
                 _buildActionCard(
                   context,
-                  icon: Icons.mic,
+                  icon: LucideIcons.mic,
                   label: context.t('homeView.actions.voice'),
                   color: AppColors.purple600,
                   bgColor: AppColors.purple100,
@@ -451,7 +452,7 @@ class _HomeViewState extends State<HomeView> {
                 ),
                 _buildActionCard(
                   context,
-                  icon: Icons.videocam,
+                  icon: LucideIcons.video,
                   label: context.t('homeView.actions.record'),
                   color: AppColors.red500,
                   bgColor: AppColors.red100,
@@ -460,7 +461,7 @@ class _HomeViewState extends State<HomeView> {
                 ),
                 _buildActionCard(
                   context,
-                  icon: Icons.history,
+                  icon: LucideIcons.history,
                   label: context.t('homeView.actions.history'),
                   color: AppColors.amber600,
                   bgColor: AppColors.amber100,
@@ -469,7 +470,7 @@ class _HomeViewState extends State<HomeView> {
                 ),
                 _buildActionCard(
                   context,
-                  icon: Icons.auto_awesome,
+                  icon: LucideIcons.sparkles,
                   label: context.t('homeView.actions.llmAdvice'),
                   color: const Color(0xFF059669),
                   bgColor: const Color(0xFFD1FAE5),
@@ -609,25 +610,32 @@ class _HomeViewState extends State<HomeView> {
                     end: Alignment.bottomRight,
                     colors: [bgColor, bgColorLight],
                   ),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(icon, size: 28, color: color), // Slightly smaller icon
-              ),
-              const SizedBox(height: 12),
-              Expanded(
-                child: Center(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      label,
-                      style: TextStyle(
-                        color: AppColors.gray700,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withOpacity(0.2),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
                     ),
+                  ],
+                ),
+                child: Icon(icon, size: 28, color: color),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: AppColors.gray800,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.2,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ),

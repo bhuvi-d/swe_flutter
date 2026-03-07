@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
-import '../core/theme/app_colors.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+import '../core/utils/responsive_layout.dart';
 import '../services/audio_service.dart';
+import '../services/chat_service.dart';
 import '../core/localization/translation_service.dart';
 
-/// Voice Doctor View - A voice-enabled AI interface for symptom diagnosis
-/// US14: Voice input for symptom description with language selection
-/// US16: Confirmation of captured input
+/// Voice Doctor View — Premium dark theme with real AI and responsive layout.
+///
+/// US14: Voice input for symptom description with language selection.
+/// US16: Confirmation of captured input.
 class VoiceDoctorView extends StatefulWidget {
   final VoidCallback? onBack;
 
-  const VoiceDoctorView({
-    super.key,
-    this.onBack,
-  });
+  const VoiceDoctorView({super.key, this.onBack});
 
   @override
   State<VoiceDoctorView> createState() => _VoiceDoctorViewState();
@@ -28,7 +28,6 @@ class _VoiceDoctorViewState extends State<VoiceDoctorView> with SingleTickerProv
   bool _isInitialized = false;
   late AnimationController _pulseController;
 
-  // US14: Language selection for STT
   String _selectedLocale = 'en_US';
   List<stt.LocaleName> _availableLocales = [];
 
@@ -91,14 +90,11 @@ class _VoiceDoctorViewState extends State<VoiceDoctorView> with SingleTickerProv
     super.dispose();
   }
 
-  /// US14: Toggle listening with selected language
   void _toggleListening() async {
     if (_isListening) {
       await _speech.stop();
       setState(() => _isListening = false);
-      if (_transcript.isNotEmpty) {
-        _analyzeSymptoms();
-      }
+      if (_transcript.isNotEmpty) _analyzeSymptoms();
     } else {
       if (!_isInitialized) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -115,9 +111,7 @@ class _VoiceDoctorViewState extends State<VoiceDoctorView> with SingleTickerProv
 
       await _speech.listen(
         onResult: (result) {
-          setState(() {
-            _transcript = result.recognizedWords;
-          });
+          setState(() => _transcript = result.recognizedWords);
         },
         localeId: _selectedLocale,
         listenFor: const Duration(seconds: 30),
@@ -126,35 +120,30 @@ class _VoiceDoctorViewState extends State<VoiceDoctorView> with SingleTickerProv
     }
   }
 
-  void _analyzeSymptoms() async {
+  Future<void> _analyzeSymptoms() async {
     setState(() => _isAnalyzing = true);
 
-    // Simulate AI analysis
-    await Future.delayed(const Duration(seconds: 2));
-
-    if (mounted) {
-      setState(() {
-        _isAnalyzing = false;
-        _response = _generateResponse(_transcript);
-      });
-
-      // US16: Voice confirmation of result
-      audioService.confirmAction('success');
-      audioService.speak(_response);
-    }
-  }
-
-  String _generateResponse(String symptoms) {
-    final lowerSymptoms = symptoms.toLowerCase();
-    
-    if (lowerSymptoms.contains('yellow') || lowerSymptoms.contains('पीला')) {
-      return "Based on your description, this appears to be a nutrient deficiency or possible fungal infection causing yellowing leaves. Recommended: Apply nitrogen-rich fertilizer and check soil pH.";
-    } else if (lowerSymptoms.contains('spot') || lowerSymptoms.contains('धब्बे')) {
-      return "The spots you're describing could indicate a fungal disease like Leaf Spot. Recommended: Remove affected leaves, improve air circulation, and apply fungicide if needed.";
-    } else if (lowerSymptoms.contains('wilt') || lowerSymptoms.contains('मुर्झाना')) {
-      return "Wilting symptoms suggest possible root problems or water stress. Recommended: Check for root rot, ensure proper drainage, and water consistently.";
-    } else {
-      return "Based on your description of '$symptoms', I recommend capturing a photo for more accurate diagnosis. Common causes include pest damage, environmental stress, or nutrient imbalance.";
+    try {
+      // Use real AI via ChatService
+      final aiResponse = await ChatService.getResponse(
+        "A farmer describes the following crop symptoms: '$_transcript'. "
+        "Provide a brief diagnosis and recommended treatment in 3-4 sentences."
+      );
+      if (mounted) {
+        setState(() {
+          _isAnalyzing = false;
+          _response = aiResponse;
+        });
+        audioService.confirmAction('success');
+        audioService.speak(_response);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isAnalyzing = false;
+          _response = "I couldn't analyze that right now. Please try again or describe your symptoms differently.";
+        });
+      }
     }
   }
 
@@ -168,82 +157,86 @@ class _VoiceDoctorViewState extends State<VoiceDoctorView> with SingleTickerProv
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF0F1A2E),
       appBar: AppBar(
-        title: Text(context.t('voiceView.title')),
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
           onPressed: widget.onBack ?? () => Navigator.pop(context),
+          color: Colors.white70,
         ),
-        foregroundColor: AppColors.nature700,
+        title: Text(
+          context.t('voiceView.title'),
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
       ),
-      extendBodyBehindAppBar: true,
       body: Container(
         width: double.infinity,
         height: double.infinity,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [AppColors.nature50, Color(0xFFD1FAE5)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF0F1A2E), Color(0xFF1A2940)],
           ),
         ),
         child: SafeArea(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                // US14: Language Selection Dropdown
-                _buildLanguageSelector(),
-
-                const SizedBox(height: 30),
-
-                // Pulsing Mic Button
-                _buildMicButton(),
-
-                const SizedBox(height: 20),
-
-                // Status Text
-                Text(
-                  _isListening
-                      ? context.t('voiceView.listening')
-                      : (_isInitialized
-                          ? context.t('voiceView.tapToSpeak')
-                          : 'Initializing...'),
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: _isListening ? AppColors.nature600 : AppColors.gray600,
-                  ),
-                ),
-
-                const SizedBox(height: 40),
-
-                // Transcript Card
-                if (_transcript.isNotEmpty) _buildTranscriptCard(),
-
-                // AI Response Card
-                if (_isAnalyzing)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 30),
-                    child: CircularProgressIndicator(),
-                  )
-                else if (_response.isNotEmpty) ...[
+            child: ResponsiveBody(
+              child: Column(
+                children: [
+                  const SizedBox(height: 10),
+                  _buildLanguageSelector(),
+                  const SizedBox(height: 40),
+                  _buildMicButton(),
                   const SizedBox(height: 20),
-                  _buildResponseCard(),
-                  const SizedBox(height: 20),
-                  ElevatedButton.icon(
-                    onPressed: _clearAndRetry,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Ask Again'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.nature600,
-                      foregroundColor: Colors.white,
+                  // Status text
+                  Text(
+                    _isListening
+                        ? context.t('voiceView.listening')
+                        : (_isInitialized ? context.t('voiceView.tapToSpeak') : 'Initializing...'),
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: _isListening ? const Color(0xFF10B981) : Colors.white54,
                     ),
                   ),
+                  if (_isListening)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: _buildWaveformIndicator(),
+                    ),
+                  const SizedBox(height: 36),
+                  if (_transcript.isNotEmpty) _buildTranscriptCard(),
+                  if (_isAnalyzing)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 30),
+                      child: CircularProgressIndicator(color: Color(0xFF10B981)),
+                    )
+                  else if (_response.isNotEmpty) ...[
+                    const SizedBox(height: 20),
+                    _buildResponseCard(),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _clearAndRetry,
+                        icon: const Icon(LucideIcons.refreshCcw, size: 18),
+                        label: const Text('Ask Again'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF10B981),
+                          side: BorderSide(color: const Color(0xFF10B981).withOpacity(0.4)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 40),
                 ],
-              ],
+              ),
             ),
           ),
         ),
@@ -251,35 +244,30 @@ class _VoiceDoctorViewState extends State<VoiceDoctorView> with SingleTickerProv
     );
   }
 
-  /// US14: Language selection dropdown
   Widget _buildLanguageSelector() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-          ),
-        ],
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
       ),
       child: Row(
         children: [
-          Icon(Icons.language, color: AppColors.nature600),
+          const Icon(LucideIcons.globe, color: Color(0xFF38BDF8), size: 20),
           const SizedBox(width: 12),
-          Text('Language:', style: TextStyle(color: AppColors.gray600)),
+          Text('Language:', style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 14)),
           const SizedBox(width: 12),
           Expanded(
             child: DropdownButton<String>(
               value: _selectedLocale,
               isExpanded: true,
               underline: const SizedBox(),
+              dropdownColor: const Color(0xFF1E2D45),
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+              iconEnabledColor: Colors.white54,
               onChanged: (value) {
-                if (value != null) {
-                  setState(() => _selectedLocale = value);
-                }
+                if (value != null) setState(() => _selectedLocale = value);
               },
               items: _localeOptions.entries.map((entry) {
                 return DropdownMenuItem(
@@ -300,33 +288,34 @@ class _VoiceDoctorViewState extends State<VoiceDoctorView> with SingleTickerProv
       child: AnimatedBuilder(
         animation: _pulseController,
         builder: (context, child) {
-          final scale = _isListening ? (1.0 + 0.1 * _pulseController.value) : 1.0;
+          final scale = _isListening ? (1.0 + 0.08 * _pulseController.value) : 1.0;
+          final glowRadius = _isListening ? 30.0 + 15.0 * _pulseController.value : 20.0;
           return Transform.scale(
             scale: scale,
             child: Container(
-              width: 120,
-              height: 120,
+              width: 130,
+              height: 130,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: _isListening
-                      ? [AppColors.red400, AppColors.red600]
-                      : [AppColors.nature400, AppColors.nature600],
+                      ? [const Color(0xFFEF4444), const Color(0xFFDC2626)]
+                      : [const Color(0xFF10B981), const Color(0xFF059669)],
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: (_isListening ? AppColors.red500 : AppColors.nature500)
-                        .withOpacity(0.4),
-                    blurRadius: 25,
-                    offset: const Offset(0, 10),
+                    color: (_isListening ? const Color(0xFFEF4444) : const Color(0xFF10B981))
+                        .withOpacity(0.35),
+                    blurRadius: glowRadius,
+                    spreadRadius: 2,
                   ),
                 ],
               ),
               child: Icon(
-                _isListening ? Icons.stop : Icons.mic,
-                size: 48,
+                _isListening ? Icons.stop_rounded : Icons.mic_rounded,
+                size: 52,
                 color: Colors.white,
               ),
             ),
@@ -336,44 +325,63 @@ class _VoiceDoctorViewState extends State<VoiceDoctorView> with SingleTickerProv
     );
   }
 
+  Widget _buildWaveformIndicator() {
+    return AnimatedBuilder(
+      animation: _pulseController,
+      builder: (context, _) {
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(7, (i) {
+            final offset = (i - 3).abs() * 0.15;
+            final height = 8 + 14 * ((_pulseController.value + offset) % 1.0);
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 2),
+              width: 4,
+              height: height,
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981).withOpacity(0.6),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            );
+          }),
+        );
+      },
+    );
+  }
+
   Widget _buildTranscriptCard() {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 15,
-          ),
-        ],
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFF818CF8).withOpacity(0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.person, color: AppColors.purple500, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                context.t('voiceView.youSaid'),
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.purple600,
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF818CF8).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
                 ),
+                child: const Icon(LucideIcons.user, size: 16, color: Color(0xFF818CF8)),
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                'You said',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF818CF8), fontSize: 14),
               ),
             ],
           ),
           const SizedBox(height: 12),
           Text(
             _transcript,
-            style: TextStyle(
-              fontSize: 16,
-              color: AppColors.gray700,
-              height: 1.5,
-            ),
+            style: TextStyle(fontSize: 15, color: Colors.white.withOpacity(0.8), height: 1.5),
           ),
         ],
       ),
@@ -385,13 +393,9 @@ class _VoiceDoctorViewState extends State<VoiceDoctorView> with SingleTickerProv
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.nature100, Colors.white],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.nature200),
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFF10B981).withOpacity(0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -401,18 +405,18 @@ class _VoiceDoctorViewState extends State<VoiceDoctorView> with SingleTickerProv
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppColors.nature500,
-                  borderRadius: BorderRadius.circular(8),
+                  gradient: const LinearGradient(colors: [Color(0xFF10B981), Color(0xFF059669)]),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.eco, size: 20, color: Colors.white),
+                child: const Icon(LucideIcons.brain, size: 18, color: Colors.white),
               ),
               const SizedBox(width: 12),
               Text(
                 context.t('voiceView.aiDoctor'),
-                style: TextStyle(
+                style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
-                  color: AppColors.nature700,
+                  color: Color(0xFF10B981),
                 ),
               ),
             ],
@@ -420,11 +424,7 @@ class _VoiceDoctorViewState extends State<VoiceDoctorView> with SingleTickerProv
           const SizedBox(height: 16),
           Text(
             _response,
-            style: TextStyle(
-              fontSize: 15,
-              color: AppColors.gray700,
-              height: 1.6,
-            ),
+            style: TextStyle(fontSize: 15, color: Colors.white.withOpacity(0.8), height: 1.6),
           ),
         ],
       ),

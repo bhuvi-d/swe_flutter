@@ -1,19 +1,18 @@
 import 'package:flutter/material.dart';
-import '../core/theme/app_colors.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+import '../core/utils/responsive_layout.dart';
 import '../services/preferences_service.dart';
 import '../models/analysis_result.dart';
 import '../widgets/crop_advice_card.dart';
 import '../widgets/media_gallery.dart';
 
-/// History View - View past diagnosis history
-/// Matches React's HistoryView component in CropDiagnosisApp.jsx
+/// History View — Premium dark theme with responsive grid/list.
+///
+/// Shows past diagnosis history and pending uploads in tabs.
 class HistoryView extends StatefulWidget {
   final VoidCallback onBack;
 
-  const HistoryView({
-    super.key,
-    required this.onBack,
-  });
+  const HistoryView({super.key, required this.onBack});
 
   @override
   State<HistoryView> createState() => _HistoryViewState();
@@ -48,9 +47,7 @@ class _HistoryViewState extends State<HistoryView> with SingleTickerProviderStat
       }
     } catch (e) {
       debugPrint('Error loading history: $e');
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -85,34 +82,37 @@ class _HistoryViewState extends State<HistoryView> with SingleTickerProviderStat
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF0F1A2E),
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: const Color(0xFF0F1A2E),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
           onPressed: widget.onBack,
-          color: AppColors.gray700,
+          color: Colors.white70,
         ),
         title: const Text(
           'History & Uploads',
-          style: TextStyle(color: AppColors.gray800),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(LucideIcons.refreshCcw, size: 20),
             onPressed: () {
               setState(() => _isLoading = true);
               _loadHistory();
             },
-            color: AppColors.gray600,
+            color: Colors.white54,
           ),
         ],
         bottom: TabBar(
           controller: _tabController,
-          labelColor: AppColors.nature600,
-          unselectedLabelColor: AppColors.gray500,
-          indicatorColor: AppColors.nature600,
+          labelColor: const Color(0xFF10B981),
+          unselectedLabelColor: Colors.white38,
+          indicatorColor: const Color(0xFF10B981),
+          indicatorWeight: 3,
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
           tabs: const [
             Tab(text: 'Analysis History'),
             Tab(text: 'Pending Uploads'),
@@ -122,32 +122,49 @@ class _HistoryViewState extends State<HistoryView> with SingleTickerProviderStat
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [AppColors.nature50, Color(0xFFD1FAE5)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF0F1A2E), Color(0xFF1A2940)],
           ),
         ),
         child: TabBarView(
           controller: _tabController,
           children: [
-            // Tab 1: Analysis History
             _isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFF10B981)))
                 : _history.isEmpty
                     ? _buildEmptyState()
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _history.length,
-                        itemBuilder: (context, index) {
-                          return _buildHistoryCard(context, _history[index]);
-                        },
-                      ),
-            
-            // Tab 2: Pending Uploads (Media Gallery)
+                    : _buildHistoryList(context),
             const MediaGallery(),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildHistoryList(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final isWide = width >= Breakpoints.mobile;
+
+    if (isWide) {
+      // Grid for tablet/desktop
+      return GridView.builder(
+        padding: responsivePadding(context),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: width >= Breakpoints.tablet ? 3 : 2,
+          crossAxisSpacing: 14,
+          mainAxisSpacing: 14,
+          childAspectRatio: 1.5,
+        ),
+        itemCount: _history.length,
+        itemBuilder: (context, index) => _buildHistoryCard(context, _history[index]),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _history.length,
+      itemBuilder: (context, index) => _buildHistoryCard(context, _history[index]),
     );
   }
 
@@ -157,33 +174,22 @@ class _HistoryViewState extends State<HistoryView> with SingleTickerProviderStat
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(32),
+            padding: const EdgeInsets.all(28),
             decoration: BoxDecoration(
-              color: AppColors.amber100,
+              color: const Color(0xFFFBBF24).withOpacity(0.1),
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              Icons.history,
-              size: 64,
-              color: AppColors.amber600,
-            ),
+            child: const Icon(LucideIcons.history, size: 56, color: Color(0xFFFBBF24)),
           ),
           const SizedBox(height: 24),
-          Text(
+          const Text(
             'No History Yet',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: AppColors.gray800,
-            ),
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
           ),
           const SizedBox(height: 8),
           Text(
             'Your plant diagnosis history will appear here',
-            style: TextStyle(
-              fontSize: 16,
-              color: AppColors.gray500,
-            ),
+            style: TextStyle(fontSize: 15, color: Colors.white.withOpacity(0.5)),
           ),
         ],
       ),
@@ -192,47 +198,40 @@ class _HistoryViewState extends State<HistoryView> with SingleTickerProviderStat
 
   Widget _buildHistoryCard(BuildContext context, AnalysisResult item) {
     final isHealthy = item.disease.toLowerCase() == 'healthy';
-    
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         child: InkWell(
           onTap: () => _showAdvice(item),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                // Plant Icon
                 Container(
-                  width: 60,
-                  height: 60,
+                  width: 54,
+                  height: 54,
                   decoration: BoxDecoration(
-                    color: isHealthy ? AppColors.nature100 : AppColors.amber100,
-                    borderRadius: BorderRadius.circular(12),
+                    color: isHealthy
+                        ? const Color(0xFF10B981).withOpacity(0.15)
+                        : const Color(0xFFFBBF24).withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                   child: Icon(
-                    Icons.eco,
-                    size: 32,
-                    color: isHealthy ? AppColors.nature600 : AppColors.amber600,
+                    LucideIcons.leaf,
+                    size: 26,
+                    color: isHealthy ? const Color(0xFF10B981) : const Color(0xFFFBBF24),
                   ),
                 ),
-                const SizedBox(width: 16),
-
-                // Details
+                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -240,12 +239,11 @@ class _HistoryViewState extends State<HistoryView> with SingleTickerProviderStat
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            item.crop,
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.gray800,
+                          Flexible(
+                            child: Text(
+                              item.crop,
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           _buildSeverityBadge(item.severity),
@@ -255,8 +253,8 @@ class _HistoryViewState extends State<HistoryView> with SingleTickerProviderStat
                       Text(
                         item.disease,
                         style: TextStyle(
-                          fontSize: 15,
-                          color: isHealthy ? AppColors.nature600 : AppColors.amber700,
+                          fontSize: 14,
+                          color: isHealthy ? const Color(0xFF10B981) : const Color(0xFFFBBF24),
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -266,25 +264,15 @@ class _HistoryViewState extends State<HistoryView> with SingleTickerProviderStat
                         children: [
                           Text(
                             _formatDate(item.date),
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: AppColors.gray400,
-                            ),
+                            style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.4)),
                           ),
                           Row(
                             children: [
-                              Icon(
-                                Icons.insights,
-                                size: 14,
-                                color: AppColors.blue500,
-                              ),
+                              Icon(LucideIcons.barChart, size: 13, color: const Color(0xFF38BDF8)),
                               const SizedBox(width: 4),
                               Text(
-                                '${(item.confidence * 100).toInt()}% conf.',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: AppColors.blue500,
-                                ),
+                                '${(item.confidence * 100).toInt()}%',
+                                style: const TextStyle(fontSize: 12, color: Color(0xFF38BDF8), fontWeight: FontWeight.w600),
                               ),
                             ],
                           ),
@@ -302,46 +290,37 @@ class _HistoryViewState extends State<HistoryView> with SingleTickerProviderStat
   }
 
   Widget _buildSeverityBadge(String severity) {
-    Color bgColor;
-    Color textColor;
+    Color color;
     switch (severity.toLowerCase()) {
       case 'high':
       case 'severe':
-        bgColor = AppColors.red100;
-        textColor = AppColors.red600;
+        color = const Color(0xFFEF4444);
         break;
       case 'moderate':
       case 'medium':
-        bgColor = AppColors.amber100;
-        textColor = AppColors.amber700;
+        color = const Color(0xFFFBBF24);
         break;
       case 'low':
-        bgColor = AppColors.blue100;
-        textColor = AppColors.blue600;
+        color = const Color(0xFF38BDF8);
         break;
       case 'healthy':
       case 'none':
-        bgColor = AppColors.nature100;
-        textColor = AppColors.nature600;
+        color = const Color(0xFF10B981);
         break;
       default:
-        bgColor = AppColors.gray100;
-        textColor = AppColors.gray600;
+        color = Colors.white38;
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
       decoration: BoxDecoration(
-        color: bgColor,
+        color: color.withOpacity(0.15),
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Text(
-        severity.isEmpty ? 'Unknown' : severity,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: textColor,
-        ),
+        severity.isEmpty ? 'N/A' : severity,
+        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color),
       ),
     );
   }
@@ -349,16 +328,9 @@ class _HistoryViewState extends State<HistoryView> with SingleTickerProviderStat
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final diff = now.difference(date);
-
-    if (diff.inDays == 0) {
-      return 'Today';
-    } else if (diff.inDays == 1) {
-      return 'Yesterday';
-    } else if (diff.inDays < 7) {
-      return '${diff.inDays} days ago';
-    } else {
-      return '${date.day}/${date.month}/${date.year}';
-    }
+    if (diff.inDays == 0) return 'Today';
+    if (diff.inDays == 1) return 'Yesterday';
+    if (diff.inDays < 7) return '${diff.inDays} days ago';
+    return '${date.day}/${date.month}/${date.year}';
   }
 }
-

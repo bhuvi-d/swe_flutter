@@ -49,3 +49,16 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
 
     // 4. Language Screen
+    expect(find.byType(LanguageScreen), findsOneWidget);
+    expect(find.text('English'), findsOneWidget);
+
+    // Tap 'English'
+    await tester.tap(find.text('English'));
+    await tester.pump(const Duration(seconds: 1));
+
+    // 5. Home View
+    expect(find.byType(HomeView), findsOneWidget);
+    // Grid items should exist
+    expect(find.byIcon(Icons.camera_alt), findsOneWidget);
+  });
+}

@@ -1,33 +1,23 @@
 import 'package:flutter/material.dart';
-import '../core/theme/app_colors.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+import '../core/utils/responsive_layout.dart';
 import '../core/localization/translation_service.dart';
 import '../services/crop_advice_service.dart';
 import '../widgets/crop_advice_card.dart';
-import '../models/analysis_result.dart';
 
-/// LLM Advice View - AI-powered crop disease diagnosis and advice.
-/// 
-/// Features:
-/// - Manual input for crop name and disease.
-/// - Severity selection (Low, Medium, High).
-/// - Confidence level input.
-/// - Displays AI-generated advice using `CropAdviceService`.
-/// 
-/// Matches React's `LlmAdviceView` component in `CropDiagnosisApp.jsx`.
+/// LLM Advice View — Premium dark theme with responsive layout.
+///
+/// Manual AI-powered crop diagnosis: enter crop, disease, severity, confidence.
 class LlmAdviceView extends StatefulWidget {
   final VoidCallback onBack;
 
-  const LlmAdviceView({
-    super.key,
-    required this.onBack,
-  });
+  const LlmAdviceView({super.key, required this.onBack});
 
   @override
   State<LlmAdviceView> createState() => _LlmAdviceViewState();
 }
 
 class _LlmAdviceViewState extends State<LlmAdviceView> {
-  // Default user input values
   final _cropController = TextEditingController(text: 'Tomato');
   final _diseaseController = TextEditingController(text: 'Early Blight');
   String _severity = 'medium';
@@ -42,16 +32,8 @@ class _LlmAdviceViewState extends State<LlmAdviceView> {
     super.dispose();
   }
 
-  /// Fetches AI-generated advice based on user inputs.
-  /// 
-  /// Calls `CropAdviceService.getCropAdvice` with the provided parameters.
-  /// Displays the result in a scrollable modal bottom sheet using `CropAdviceCard`.
-  /// Handles loading states and error display.
   Future<void> _getAdvice() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    setState(() { _isLoading = true; _error = null; });
 
     try {
       final result = await CropAdviceService.getCropAdvice(
@@ -62,12 +44,8 @@ class _LlmAdviceViewState extends State<LlmAdviceView> {
       );
 
       if (!mounted) return;
+      setState(() => _isLoading = false);
 
-      setState(() {
-        _isLoading = false;
-      });
-
-      // Show the advice card
       await showModalBottomSheet(
         context: context,
         isScrollControlled: true,
@@ -95,367 +73,316 @@ class _LlmAdviceViewState extends State<LlmAdviceView> {
       );
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
+      setState(() { _error = e.toString(); _isLoading = false; });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF0F1A2E),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
           onPressed: widget.onBack,
-          color: AppColors.gray700,
+          color: Colors.white70,
         ),
         title: Text(
           context.t('llmAdvice.title'),
-          style: const TextStyle(color: AppColors.gray800),
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
       ),
       body: Container(
+        width: double.infinity,
+        height: double.infinity,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [AppColors.nature50, Color(0xFFD1FAE5)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF0F1A2E), Color(0xFF1A2940)],
           ),
         ),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Center(
-                child: Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF10B981), Color(0xFF059669)],
+          child: ResponsiveBody(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header Icon
+                Center(
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF10B981), Color(0xFF059669)],
+                          ),
+                          borderRadius: BorderRadius.circular(22),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF10B981).withOpacity(0.3),
+                              blurRadius: 20,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
                         ),
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.nature500.withValues(alpha: 0.4),
-                            blurRadius: 15,
-                            offset: const Offset(0, 6),
+                        child: const Icon(LucideIcons.brain, size: 40, color: Colors.white),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        context.t('llmAdvice.subtitle'),
+                        style: TextStyle(fontSize: 15, color: Colors.white.withOpacity(0.5)),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 32),
+
+                // Input Form
+                Container(
+                  padding: const EdgeInsets.all(22),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.04),
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: Colors.white.withOpacity(0.06)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        context.t('llmAdvice.diseaseInfo'),
+                        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Crop Name
+                      _buildLabel(context.t('llmAdvice.cropName')),
+                      const SizedBox(height: 8),
+                      _buildTextField(_cropController, context.t('llmAdvice.cropHint'), LucideIcons.leaf),
+                      const SizedBox(height: 16),
+
+                      // Disease
+                      _buildLabel(context.t('llmAdvice.diseaseDetected')),
+                      const SizedBox(height: 8),
+                      _buildTextField(_diseaseController, context.t('llmAdvice.diseaseHint'), LucideIcons.bug),
+                      const SizedBox(height: 16),
+
+                      // Severity & Confidence Row
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          if (constraints.maxWidth > 400) {
+                            return Row(
+                              children: [
+                                Expanded(child: _buildSeverityDropdown()),
+                                const SizedBox(width: 14),
+                                Expanded(child: _buildConfidenceField()),
+                              ],
+                            );
+                          }
+                          return Column(
+                            children: [
+                              _buildSeverityDropdown(),
+                              const SizedBox(height: 14),
+                              _buildConfidenceField(),
+                            ],
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Error
+                      if (_error != null)
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          margin: const EdgeInsets.only(bottom: 16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEF4444).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.error_outline, color: Color(0xFFEF4444), size: 20),
+                              const SizedBox(width: 10),
+                              Expanded(child: Text(_error!, style: const TextStyle(color: Color(0xFFEF4444), fontSize: 13))),
+                            ],
+                          ),
+                        ),
+
+                      // Submit Button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _isLoading ? null : _getAdvice,
+                          icon: _isLoading
+                              ? const SizedBox(
+                                  width: 20, height: 20,
+                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                )
+                              : const Icon(LucideIcons.sparkles, size: 20),
+                          label: Text(
+                            _isLoading ? context.t('llmAdvice.generating') : context.t('llmAdvice.getAdvice'),
+                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF10B981),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            elevation: 0,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+
+                // Instructions
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF38BDF8).withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.15)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(LucideIcons.info, size: 16, color: Color(0xFF38BDF8)),
+                          const SizedBox(width: 8),
+                          Text(
+                            context.t('llmAdvice.howToUse'),
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF38BDF8)),
                           ),
                         ],
                       ),
-                      child: const Icon(
-                        Icons.eco,
-                        size: 48,
-                        color: Colors.white,
+                      const SizedBox(height: 8),
+                      Text(
+                        context.t('llmAdvice.instructions'),
+                        style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.5), height: 1.5),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      context.t('llmAdvice.subtitle'),
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: AppColors.gray600,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 32),
-
-              // Input Form
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      context.t('llmAdvice.diseaseInfo'),
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.gray800,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Crop Name
-                    Text(
-                      context.t('llmAdvice.cropName'),
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.gray700,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _cropController,
-                      decoration: InputDecoration(
-                        hintText: context.t('llmAdvice.cropHint'),
-                        filled: true,
-                        fillColor: AppColors.gray50,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: AppColors.gray200),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: AppColors.gray200),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: AppColors.nature500, width: 2),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Disease Detected
-                    Text(
-                      context.t('llmAdvice.diseaseDetected'),
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.gray700,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _diseaseController,
-                      decoration: InputDecoration(
-                        hintText: context.t('llmAdvice.diseaseHint'),
-                        filled: true,
-                        fillColor: AppColors.gray50,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: AppColors.gray200),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: AppColors.gray200),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: AppColors.nature500, width: 2),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Severity and Confidence row
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                context.t('llmAdvice.severity'),
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppColors.gray700,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12),
-                                decoration: BoxDecoration(
-                                  color: AppColors.gray50,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: AppColors.gray200),
-                                ),
-                                child: DropdownButtonHideUnderline(
-                                  child: DropdownButton<String>(
-                                    value: _severity,
-                                    isExpanded: true,
-                                    items: ['low', 'medium', 'high'].map((s) {
-                                      return DropdownMenuItem(
-                                        value: s,
-                                        child: Text(s[0].toUpperCase() + s.substring(1)),
-                                      );
-                                    }).toList(),
-                                    onChanged: (v) => setState(() => _severity = v!),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                context.t('llmAdvice.confidence'),
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppColors.gray700,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              TextField(
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                decoration: InputDecoration(
-                                  hintText: '0.00 - 1.00',
-                                  filled: true,
-                                  fillColor: AppColors.gray50,
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: AppColors.gray200),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: AppColors.gray200),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: AppColors.nature500, width: 2),
-                                  ),
-                                ),
-                                onChanged: (v) {
-                                  final val = double.tryParse(v);
-                                  if (val != null && val >= 0 && val <= 1) {
-                                    setState(() => _confidence = val);
-                                  }
-                                },
-                                controller: TextEditingController(text: _confidence.toStringAsFixed(2)),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Error display
-                    if (_error != null)
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        margin: const EdgeInsets.only(bottom: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.red.shade50,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.red.shade200),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.error_outline, color: Colors.red.shade600),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                _error!,
-                                style: TextStyle(color: Colors.red.shade800),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                    // Get Advice Button
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _isLoading ? null : _getAdvice,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.nature500,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 4,
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            if (_isLoading)
-                              const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            else
-                              const Icon(Icons.eco),
-                            const SizedBox(width: 8),
-                            Text(
-                              _isLoading
-                                  ? context.t('llmAdvice.generating')
-                                  : context.t('llmAdvice.getAdvice'),
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Instructions
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.blue.shade200),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      context.t('llmAdvice.howToUse'),
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue.shade800,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      context.t('llmAdvice.instructions'),
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.blue.shade700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildLabel(String text) {
+    return Text(
+      text,
+      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white.withOpacity(0.6)),
+    );
+  }
+
+  Widget _buildTextField(TextEditingController controller, String hint, IconData icon) {
+    return TextField(
+      controller: controller,
+      style: const TextStyle(color: Colors.white, fontSize: 14),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: TextStyle(color: Colors.white.withOpacity(0.25)),
+        prefixIcon: Icon(icon, size: 18, color: const Color(0xFF10B981)),
+        filled: true,
+        fillColor: Colors.white.withOpacity(0.05),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFF10B981), width: 2),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSeverityDropdown() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildLabel(context.t('llmAdvice.severity')),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.white.withOpacity(0.1)),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _severity,
+              isExpanded: true,
+              dropdownColor: const Color(0xFF1E2D45),
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+              iconEnabledColor: Colors.white38,
+              items: ['low', 'medium', 'high'].map((s) {
+                return DropdownMenuItem(
+                  value: s,
+                  child: Text(s[0].toUpperCase() + s.substring(1)),
+                );
+              }).toList(),
+              onChanged: (v) => setState(() => _severity = v!),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildConfidenceField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildLabel(context.t('llmAdvice.confidence')),
+        const SizedBox(height: 8),
+        TextField(
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          style: const TextStyle(color: Colors.white, fontSize: 14),
+          decoration: InputDecoration(
+            hintText: '0.00 - 1.00',
+            hintStyle: TextStyle(color: Colors.white.withOpacity(0.25)),
+            prefixIcon: const Icon(LucideIcons.barChart, size: 18, color: Color(0xFF38BDF8)),
+            filled: true,
+            fillColor: Colors.white.withOpacity(0.05),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFF10B981), width: 2),
+            ),
+          ),
+          onChanged: (v) {
+            final val = double.tryParse(v);
+            if (val != null && val >= 0 && val <= 1) setState(() => _confidence = val);
+          },
+          controller: TextEditingController(text: _confidence.toStringAsFixed(2)),
+        ),
+      ],
     );
   }
 }

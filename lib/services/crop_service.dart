@@ -6,10 +6,10 @@ import 'preferences_service.dart';
 import 'ai_prediction_service.dart';
 import 'crop_advice_service.dart';
 
-/// Service for simulating crop disease analysis.
-/// 
-/// In a real application, this would upload images to a backend model.
-/// Currently, it mocks the analysis process with random results.
+/// Service for crop disease analysis.
+///
+/// Sends images to the AI model, receives predictions with severity, confidence,
+/// top-N predictions, and Grad-CAM heatmaps, then enriches with LLM advice.
 class CropService {
   // Fixed class labels that exactly match the CNN training order from the backend.
   static const List<String> classLabels = [
@@ -53,22 +53,12 @@ class CropService {
     "Tomato___healthy"
   ];
 
-  // Mock data for simulation fallback
-  final List<String> _crops = ['Tomato', 'Potato', 'Wheat', 'Rice', 'Corn'];
-  final Map<String, List<String>> _diseases = {
-    'Tomato': ['Early Blight', 'Late Blight', 'Leaf Mold', 'Healthy'],
-    'Potato': ['Early Blight', 'Late Blight', 'Healthy'],
-    'Wheat': ['Rust', 'Leaf Spot', 'Healthy'],
-    'Rice': ['Bacterial Blight', 'Blast', 'Healthy'],
-    'Corn': ['Rust', 'Leaf Blight', 'Healthy'],
-  };
-
   /// Analyzes an image to detect crop diseases.
   /// 
   /// - [imagePath]: Path to the image file.
   /// 
-  /// Returns an [AnalysisResult] with diagnostic data.
-  /// Also saves the result to local history via [PreferencesService].
+  /// Returns an [AnalysisResult] with diagnostic data including enhanced fields:
+  /// topPredictions, severity classification, and Grad-CAM heatmap.
   Future<AnalysisResult> analyzeImage(String imagePath) async {
     Map<String, dynamic>? prediction;
 
@@ -95,34 +85,56 @@ class CropService {
       final int classIndex = prediction["class_index"];
       final double confidence = prediction["confidence"];
 
-      // 6. Strict Confidence Threshold (User-requested feature)
-      // If confidence is too low, it's likely not a leaf or a very ambiguous case.
+      // 6. Strict Confidence Threshold
       if (confidence < 0.50) {
         throw Exception("Low confidence detection (${(confidence * 100).toStringAsFixed(0)}%). Please retake the photo with better lighting and ensure the leaf is centered.");
       }
 
-      // 7. Map class_index to deterministic disease name
-      final String diseaseName = classLabels[classIndex];
+      // 7. Use server-provided class name or fall back to local mapping
+      final String diseaseName = prediction["class_name"] ?? classLabels[classIndex];
       
       print("Predicted disease: $diseaseName");
       print("Confidence: $confidence");
 
-      // 8. Extract crop name for context
-      final String cropName = diseaseName.split('___').first.replaceAll('_', ' ');
+      // 8. Extract crop name — prefer server-provided, fallback to parsing
+      final String cropName = prediction["crop_name"] ??
+          diseaseName.split('___').first.replaceAll('_', ' ');
 
-      // 9. Call the CropAdviceService with mapped disease name
+      // 9. Extract enhanced fields from AI response
+      final List<Map<String, dynamic>> topPredictions = prediction["top_predictions"] != null
+          ? List<Map<String, dynamic>>.from(
+              (prediction["top_predictions"] as List).map((e) => Map<String, dynamic>.from(e)))
+          : [];
+
+      final String? heatmapBase64 = prediction["heatmap_base64"];
+
+      // Severity from AI service
+      final Map<String, dynamic>? severityData = prediction["severity"] is Map
+          ? Map<String, dynamic>.from(prediction["severity"])
+          : null;
+
+      final String severityLevel = severityData?["level"] ?? "moderate";
+      final String severityLabel = severityData?["label"] ?? 
+          (confidence > 0.8 ? "High" : (confidence > 0.6 ? "Moderate" : "Low"));
+      final String severityDescription = severityData?["description"] ?? "";
+
+      // 10. Call the CropAdviceService with mapped disease name
       final result = await CropAdviceService.getCropAdvice(
         crop: cropName,
         disease: diseaseName,
-        severity: confidence > 0.8 ? "High" : (confidence > 0.6 ? "Moderate" : "Low"),
+        severity: severityLabel,
         confidence: confidence,
       );
 
-      // 10. Update image URL to the local path and finalize details
+      // 11. Update image URL and finalize with enhanced fields
       final finalResult = result.copyWith(
         imageUrl: imagePath,
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         date: DateTime.now(),
+        topPredictions: topPredictions,
+        heatmapBase64: heatmapBase64,
+        severityLevel: severityLevel,
+        severityDescription: severityDescription,
       );
 
       // Save to history
@@ -131,7 +143,7 @@ class CropService {
       return finalResult;
     }
 
-    // 11. Final fallback for unexpected states
+    // 12. Final fallback for unexpected states
     throw Exception('An unexpected error occurred during analysis. Please try again.');
   }
 }

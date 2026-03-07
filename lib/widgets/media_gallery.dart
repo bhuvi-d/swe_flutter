@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../core/theme/app_colors.dart';
 import '../models/pending_media.dart';
 import '../services/offline_storage_service.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 
 /// A widget that displays a gallery of pending media uploads.
 /// 
@@ -108,11 +109,17 @@ class _MediaGalleryState extends State<MediaGallery> {
           ),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: () => _showMediaPreview(item),
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
               // Thumbnail / Icon
             Container(
               width: 80,
@@ -202,7 +209,9 @@ class _MediaGalleryState extends State<MediaGallery> {
             ),
           ],
         ),
+       ),
       ),
+     ),
     );
   }
 
@@ -224,5 +233,93 @@ class _MediaGalleryState extends State<MediaGallery> {
     }
     
     return null;
+  }
+
+  /// Shows a modal dialog to preview the pending media
+  void _showMediaPreview(PendingMedia item) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: Container(
+          width: double.infinity,
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.8,
+            maxWidth: 600,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: SingleChildScrollView(
+                    child: Stack(
+                      children: [
+                        _getImageProvider(item) != null 
+                          ? Image(
+                              image: _getImageProvider(item)!,
+                              width: double.infinity,
+                              fit: BoxFit.contain,
+                            )
+                          : Container(
+                              height: 300,
+                              width: double.infinity,
+                              color: AppColors.gray100,
+                              child: Center(
+                                child: Icon(
+                                  item.fileType == 'video' ? Icons.videocam : Icons.image,
+                                  size: 64,
+                                  color: AppColors.gray400,
+                                ),
+                              ),
+                            ),
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: IconButton(
+                            icon: const Icon(Icons.close, color: Colors.black54),
+                            style: IconButton.styleFrom(
+                              backgroundColor: Colors.white.withOpacity(0.8),
+                            ),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Connecting to Sync Service...'),
+                      backgroundColor: AppColors.nature600,
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.cloud_upload),
+                label: const Text('Sync Now'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.nature600,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 4,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

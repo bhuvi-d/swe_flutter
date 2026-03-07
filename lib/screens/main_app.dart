@@ -21,6 +21,7 @@ import 'audio_settings_view.dart';
 import 'video_recorder_view.dart';
 import 'llm_advice_view.dart';
 import 'smart_camera_guide_view.dart';
+import 'diagnosis_result_screen.dart';
 import '../models/pending_media.dart';
 import '../models/analysis_result.dart';
 import '../services/offline_storage_service.dart';
@@ -293,29 +294,13 @@ class _MainAppState extends State<MainApp> {
                 ),
               );
               
-              // Show Result
-              await showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                backgroundColor: Colors.transparent,
-                builder: (context) => Container(
-                  height: MediaQuery.of(context).size.height * 0.9,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(24),
-                      topRight: Radius.circular(24),
-                    ),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(24),
-                      topRight: Radius.circular(24),
-                    ),
-                    child: CropAdviceCard(
-                      result: result,
-                      onClose: () => Navigator.pop(context),
-                    ),
+              // US17-20: Show DiagnosisResultScreen with full results
+              if (!mounted) return;
+              await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => DiagnosisResultScreen(
+                    result: result,
+                    onClose: () => Navigator.of(context).pop(),
                   ),
                 ),
               );
@@ -384,9 +369,8 @@ class _MainAppState extends State<MainApp> {
         );
       case 'upload':
         return UploadView(
-          isOnline: _isOnline,
           onBack: () => _navigateTo('home'),
-          onUpload: (paths) async {
+          onImagesSelected: (paths) async {
             if (paths.isEmpty) return;
             
             // Show loading
@@ -425,30 +409,13 @@ class _MainAppState extends State<MainApp> {
                 );
               }
 
-              // Show Result of the first one
-              if (firstResult != null) {
-                await showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  backgroundColor: Colors.transparent,
-                  builder: (context) => Container(
-                    height: MediaQuery.of(context).size.height * 0.9,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(24),
-                        topRight: Radius.circular(24),
-                      ),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(24),
-                        topRight: Radius.circular(24),
-                      ),
-                      child: CropAdviceCard(
-                        result: firstResult!,
-                        onClose: () => Navigator.pop(context),
-                      ),
+              // US17-20: Show DiagnosisResultScreen for the first result
+              if (firstResult != null && mounted) {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => DiagnosisResultScreen(
+                      result: firstResult!,
+                      onClose: () => Navigator.of(context).pop(),
                     ),
                   ),
                 );

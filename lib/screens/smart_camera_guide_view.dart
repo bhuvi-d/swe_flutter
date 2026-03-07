@@ -145,7 +145,7 @@ class SmartCameraGuideView extends StatelessWidget {
                         height: 56,
                         child: ElevatedButton(
                           onPressed: () {
-                            audioService.playClick();
+                            audioService.playSound('click');
                             onStart();
                           },
                           style: ElevatedButton.styleFrom(

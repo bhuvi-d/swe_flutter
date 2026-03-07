@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -38,6 +39,8 @@ class _CropAdviceCardState extends State<CropAdviceCard> {
   String? _regionAdvice;
   String? _translatedRegionAdvice;
   Map<String, dynamic>? _structuredTreatments;
+  bool _showOrganic = true; // Controls the Organic/Chemical tab switcher
+  bool _showHeatmapOverlay = false; // Controls heatmap display in report
 
   @override
   void initState() {
@@ -208,6 +211,20 @@ Analysis: ${widget.result.cause}
 
                   const SizedBox(height: 24),
 
+                  // Heatmap Viewer (US20)
+                  if (widget.result.heatmapBase64 != null) ...[
+                    _buildSectionTitle(Icons.layers, 'Affected Areas', Colors.redAccent),
+                    _buildHeatmapViewer(),
+                    const SizedBox(height: 24),
+                  ],
+
+                  // Top Predictions (US18)
+                  if (widget.result.topPredictions.isNotEmpty) ...[
+                    _buildSectionTitle(Icons.bar_chart, 'Alternative Predictions', const Color(0xFF818CF8)),
+                    _buildTopPredictionsSection(),
+                    const SizedBox(height: 24),
+                  ],
+
                   // AI Insight Section (Quick Tip)
                   _buildSectionTitle(LucideIcons.sparkles, 'AI Insight', Colors.purpleAccent),
                   _buildGlassInfoCard(
@@ -254,23 +271,181 @@ Analysis: ${widget.result.cause}
 
                   const SizedBox(height: 24),
 
-                  // Organic Treatment Section
-                  _buildSectionTitle(Icons.eco, 'Organic Treatment', const Color(0xFF10B981)),
-                  _buildStepsList(
-                    _translatedOrganicSteps.isEmpty ? widget.result.organicSteps : _translatedOrganicSteps,
-                    type: 'organic',
+                  const SizedBox(height: 24),
+
+                  // Treatment Tabs (Organic vs Chemical)
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() => _showOrganic = true),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: _showOrganic ? const Color(0xFF10B981).withOpacity(0.2) : Colors.transparent,
+                                borderRadius: BorderRadius.circular(8),
+                                border: _showOrganic ? Border.all(color: const Color(0xFF10B981).withOpacity(0.5)) : null,
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.eco, size: 18, color: _showOrganic ? const Color(0xFF10B981) : Colors.white54),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Organic',
+                                    style: TextStyle(
+                                      color: _showOrganic ? const Color(0xFF10B981) : Colors.white54,
+                                      fontWeight: _showOrganic ? FontWeight.bold : FontWeight.normal,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() => _showOrganic = false),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: !_showOrganic ? Colors.orangeAccent.withOpacity(0.2) : Colors.transparent,
+                                borderRadius: BorderRadius.circular(8),
+                                border: !_showOrganic ? Border.all(color: Colors.orangeAccent.withOpacity(0.5)) : null,
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.science, size: 18, color: !_showOrganic ? Colors.orangeAccent : Colors.white54),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Chemical',
+                                    style: TextStyle(
+                                      color: !_showOrganic ? Colors.orangeAccent : Colors.white54,
+                                      fontWeight: !_showOrganic ? FontWeight.bold : FontWeight.normal,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
+                  const SizedBox(height: 16),
+                  
+                  // Active Treatment Content
+                  if (_showOrganic)
+                    _buildStepsList(
+                      _translatedOrganicSteps.isEmpty ? widget.result.organicSteps : _translatedOrganicSteps,
+                      type: 'organic',
+                    )
+                  else
+                    _buildStepsList(
+                      _translatedChemicalSteps.isEmpty ? widget.result.chemicalSteps : _translatedChemicalSteps,
+                      type: 'chemical',
+                    ),
 
                   const SizedBox(height: 24),
 
-                  // Chemical Treatment Section
-                  _buildSectionTitle(Icons.science, 'Chemical Treatment', Colors.orangeAccent),
-                  _buildStepsList(
-                    _translatedChemicalSteps.isEmpty ? widget.result.chemicalSteps : _translatedChemicalSteps,
-                    type: 'chemical',
-                  ),
+                  // US30: Recovery Timeline Section
+                  if (widget.result.recoveryTimeline.isNotEmpty) ...[
+                    _buildSectionTitle(Icons.timeline, 'Recovery Timeline', const Color(0xFF38BDF8)),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.white.withOpacity(0.08)),
+                      ),
+                      child: Column(
+                        children: [
+                          _buildTimelineRow(
+                            'Initial Improvement',
+                            '${widget.result.recoveryTimeline['initialDays'] ?? '3-5'} days',
+                            Icons.trending_up,
+                            const Color(0xFF38BDF8),
+                          ),
+                          const SizedBox(height: 12),
+                          _buildTimelineRow(
+                            'Full Recovery',
+                            '${widget.result.recoveryTimeline['fullRecoveryDays'] ?? '14-21'} days',
+                            Icons.favorite,
+                            const Color(0xFF10B981),
+                          ),
+                          const SizedBox(height: 12),
+                          _buildTimelineRow(
+                            'Monitoring Period',
+                            '${widget.result.recoveryTimeline['monitoringDays'] ?? '30'} days',
+                            Icons.visibility,
+                            const Color(0xFF818CF8),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
 
-                  const SizedBox(height: 24),
+                  // US31: Prevention Checklist Section
+                  if (widget.result.preventionChecklist.isNotEmpty) ...[
+                    _buildSectionTitle(Icons.shield_outlined, 'Prevention Tips', const Color(0xFF22C55E)),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.white.withOpacity(0.08)),
+                      ),
+                      child: Column(
+                        children: widget.result.preventionChecklist.asMap().entries.map((entry) {
+                          final idx = entry.key;
+                          final tip = entry.value;
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            decoration: BoxDecoration(
+                              border: idx < widget.result.preventionChecklist.length - 1
+                                  ? Border(bottom: BorderSide(color: Colors.white.withOpacity(0.05)))
+                                  : null,
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  width: 22,
+                                  height: 22,
+                                  margin: const EdgeInsets.only(top: 1),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: const Color(0xFF22C55E).withOpacity(0.15),
+                                    border: Border.all(color: const Color(0xFF22C55E).withOpacity(0.4)),
+                                  ),
+                                  child: const Icon(Icons.check, size: 12, color: Color(0xFF22C55E)),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    tip,
+                                    style: TextStyle(
+                                      color: Colors.white.withOpacity(0.8),
+                                      fontSize: 14,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
 
                   // Regional Advice Section
                   if (_regionAdvice != null) ...[
@@ -579,6 +754,164 @@ Analysis: ${widget.result.cause}
     );
   }
 
+  // US20: Heatmap viewer with toggle
+  Widget _buildHeatmapViewer() {
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: () => setState(() => _showHeatmapOverlay = !_showHeatmapOverlay),
+          child: Container(
+            height: 220,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withOpacity(0.1)),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (_showHeatmapOverlay && widget.result.heatmapBase64 != null)
+                    Image.memory(
+                      base64Decode(widget.result.heatmapBase64!),
+                      fit: BoxFit.cover,
+                      gaplessPlayback: true,
+                    )
+                  else
+                    _buildImage(),
+                  Positioned(
+                    bottom: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: _showHeatmapOverlay
+                            ? Colors.redAccent.withOpacity(0.3)
+                            : Colors.black54,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: _showHeatmapOverlay
+                              ? Colors.redAccent.withOpacity(0.5)
+                              : Colors.white24,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _showHeatmapOverlay ? Icons.layers_clear : Icons.layers,
+                            size: 14,
+                            color: _showHeatmapOverlay ? Colors.redAccent : Colors.white70,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _showHeatmapOverlay ? 'Original' : 'Heatmap',
+                            style: TextStyle(
+                              color: _showHeatmapOverlay ? Colors.redAccent : Colors.white70,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Tap to toggle affected area heatmap',
+          style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
+        ),
+      ],
+    );
+  }
+
+  // US18: Top predictions bar chart
+  Widget _buildTopPredictionsSection() {
+    final predictions = widget.result.topPredictions;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.06)),
+      ),
+      child: Column(
+        children: predictions.asMap().entries.map((entry) {
+          final idx = entry.key;
+          final pred = entry.value;
+          final conf = (pred['confidence'] as num?)?.toDouble() ?? 0.0;
+          final disease = pred['disease'] as String? ?? 'Unknown';
+          final isTop = idx == 0;
+
+          return Padding(
+            padding: EdgeInsets.only(bottom: idx < predictions.length - 1 ? 8 : 0),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 16,
+                  child: Text(
+                    '${idx + 1}',
+                    style: TextStyle(
+                      color: isTop ? const Color(0xFF10B981) : Colors.white38,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    disease,
+                    style: TextStyle(
+                      color: isTop ? Colors.white : Colors.white60,
+                      fontSize: 12,
+                      fontWeight: isTop ? FontWeight.w600 : FontWeight.normal,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  flex: 4,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(3),
+                    child: LinearProgressIndicator(
+                      value: conf,
+                      minHeight: 6,
+                      backgroundColor: Colors.white.withOpacity(0.06),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        isTop ? const Color(0xFF10B981) : const Color(0xFF818CF8).withOpacity(0.5),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                SizedBox(
+                  width: 40,
+                  child: Text(
+                    '${(conf * 100).toStringAsFixed(1)}%',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      color: isTop ? const Color(0xFF10B981) : Colors.white38,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
   Color _getSeverityColor(String severity) {
     switch (severity.toLowerCase()) {
       case 'severe':
@@ -593,5 +926,48 @@ Analysis: ${widget.result.cause}
       default:
         return Colors.blueAccent;
     }
+  }
+
+  Widget _buildTimelineRow(String label, String duration, IconData icon, Color color) {
+    return Row(
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: color.withOpacity(0.15),
+            border: Border.all(color: color.withOpacity(0.4)),
+          ),
+          child: Icon(icon, color: color, size: 18),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.8),
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            duration,
+            style: TextStyle(
+              color: color,
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
