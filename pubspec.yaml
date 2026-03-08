@@ -12,7 +12,14 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+  audioplayers: ^5.2.1
+  shared_preferences: ^2.2.2
 
+flutter:
+  # ... existing assets
+  assets:
+    - assets/translations/
+    - assets/sounds/
   # Icons
   cupertino_icons: ^1.0.8
   lucide_icons: ^0.257.0
@@ -65,3 +72,4 @@ flutter:
     - assets/translations/
     - assets/data/region_advice.json
     - assets/data/treatment_database.json
+
