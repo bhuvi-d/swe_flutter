@@ -7,7 +7,7 @@ import 'package:http/http.dart' as http;
 /// enhanced prediction result including class name, top-N predictions,
 /// severity classification, and Grad-CAM heatmap.
 class AIPredictionService {
-  static const String aiUrl = "http://localhost:8000/predict";
+  static const String aiUrl = "http://localhost:5001/predict";
 
   /// Sends [imageBytes] to the AI model and returns the full prediction map.
   ///

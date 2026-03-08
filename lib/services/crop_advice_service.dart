@@ -33,7 +33,7 @@ class CropAdviceService {
   }) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/api/llm-advice'),
+        Uri.parse('$baseUrl/api/crop-advice'),
         headers: {
           'Content-Type': 'application/json',
         },
@@ -47,7 +47,9 @@ class CropAdviceService {
       );
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
+        final body = json.decode(response.body);
+        // Backend wraps advice inside { success: true, data: { ... } }
+        final data = (body['data'] is Map) ? body['data'] as Map<String, dynamic> : body;
         
         // Return AnalysisResult for the CropAdviceCard
         return AnalysisResult(
@@ -75,15 +77,14 @@ class CropAdviceService {
           organicSteps: data['organicSteps'] != null
               ? List<String>.from(data['organicSteps'] as List)
               : [
+                  data['organic'] ?? 'Use neem-based solutions',
                   "Spray neem oil every 5–7 days",
-                  "Use baking soda solution (1 tsp per liter)",
                   "Improve soil drainage",
                 ],
           chemicalSteps: data['chemicalSteps'] != null
               ? List<String>.from(data['chemicalSteps'] as List)
               : [
-                  "Apply chlorothalonil fungicide",
-                  "Use copper-based fungicide spray",
+                  data['chemical'] ?? 'Consult local agricultural expert',
                   "Repeat treatment every 7–10 days"
                 ],
           recoveryTimeline: data['recoveryTimeline'] != null
@@ -97,8 +98,8 @@ class CropAdviceService {
           preventionChecklist: data['preventionChecklist'] != null
               ? List<String>.from(data['preventionChecklist'] as List)
               : [
+                  data['prevention'] ?? 'Maintain proper crop hygiene',
                   'Remove and destroy infected plant debris',
-                  'Ensure proper spacing between plants for airflow',
                   'Rotate crops each season to prevent soil-borne pathogens',
                   'Monitor plants weekly for early signs of disease',
                 ],

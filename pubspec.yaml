@@ -10,6 +10,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+
   flutter_localizations:
     sdk: flutter
   
@@ -28,7 +29,7 @@ dependencies:
   # Navigation
   go_router: ^14.6.2
 
-  # Local Storage
+  # Storage
   shared_preferences: ^2.3.3
   sqflite: ^2.3.3+1
   path: ^1.9.0
@@ -39,7 +40,7 @@ dependencies:
   video_player: ^2.8.2
   image: ^4.2.0
 
-  # Voice/Audio
+  # Voice / Audio
   speech_to_text: ^7.0.0
   flutter_tts: ^4.2.0
   audioplayers: ^6.1.0
@@ -54,6 +55,9 @@ dependencies:
   # Internationalization
   intl: ^0.20.2
 
+  # Utilities
+  cached_network_image: ^3.4.1
+  image: ^4.2.0
   # Geolocator
   geolocator: ^13.0.1
 
@@ -67,6 +71,7 @@ flutter:
 
   assets:
     - assets/translations/
+    - assets/sounds/
     - assets/data/region_advice.json
     - assets/data/treatment_database.json
     - assets/sounds/
