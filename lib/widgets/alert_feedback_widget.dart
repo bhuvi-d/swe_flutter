@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/theme/app_colors.dart';
@@ -41,7 +42,7 @@ class _AlertFeedbackWidgetState extends State<AlertFeedbackWidget> {
         timestamp: DateTime.now().millisecondsSinceEpoch,
       );
 
-      feedbackList.add(feedback.toJson());
+      feedbackList.add(jsonEncode(feedback.toJson()));
       await prefs.setStringList('alert_feedbacks', feedbackList);
 
       widget.onClose();

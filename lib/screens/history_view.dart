@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../core/utils/responsive_layout.dart';
 import '../services/preferences_service.dart';
+import '../services/database_service.dart';
 import '../models/analysis_result.dart';
 import '../widgets/crop_advice_card.dart';
 import '../widgets/media_gallery.dart';
@@ -38,10 +40,15 @@ class _HistoryViewState extends State<HistoryView> with SingleTickerProviderStat
 
   Future<void> _loadHistory() async {
     try {
-      final data = await preferencesService.getAnalysisHistory();
+      if (kIsWeb) {
+        // Fallback or empty for Web
+        _history = [];
+      } else {
+        _history = await databaseService.getAllDiagnoses();
+      }
+      
       if (mounted) {
         setState(() {
-          _history = data.map((json) => AnalysisResult.fromJson(json)).toList();
           _isLoading = false;
         });
       }

@@ -10,8 +10,9 @@ import '../services/preferences_service.dart';
 import '../services/tts_service.dart';
 import '../services/translation_service.dart';
 import '../services/region_service.dart';
-import '../services/preferences_service.dart';
 import '../services/treatment_service.dart';
+import '../services/explanation_service.dart';
+import 'treatment_steps_widget.dart';
 
 /// A sophisticated advice card matching the React application's high-end UI.
 /// Replicates the 'ImageAnalysis' component with a dark, premium aesthetic.
@@ -225,7 +226,19 @@ Analysis: ${widget.result.cause}
                     const SizedBox(height: 24),
                   ],
 
-                  // AI Insight Section (Quick Tip)
+                   const SizedBox(height: 24),
+ 
+                   // Simple Explanation (US23)
+                   _buildSectionTitle(LucideIcons.messageCircle, 'Simple Explanation', Colors.orangeAccent),
+                   _buildGlassInfoCard(
+                     ExplanationService.getSimpleExplanation(widget.result.disease),
+                     icon: LucideIcons.messageCircle,
+                     iconColor: Colors.orangeAccent,
+                   ),
+
+                   const SizedBox(height: 24),
+
+                   // AI Insight Section (Quick Tip)
                   _buildSectionTitle(LucideIcons.sparkles, 'AI Insight', Colors.purpleAccent),
                   _buildGlassInfoCard(
                     widget.result.cause,
@@ -610,7 +623,10 @@ Analysis: ${widget.result.cause}
       return _buildGlassInfoCard('No specific treatment steps available.', icon: Icons.info_outline, iconColor: Colors.blueAccent);
     }
 
-    return _buildStepsList(steps);
+    return TreatmentStepsWidget(
+      steps: steps,
+      themeColor: const Color(0xFF10B981),
+    );
   }
 
   Widget _buildStepsList(List<String> steps, {String type = 'organic'}) {

@@ -5,6 +5,7 @@ import '../models/analysis_result.dart';
 import 'preferences_service.dart';
 import 'ai_prediction_service.dart';
 import 'crop_advice_service.dart';
+import 'database_service.dart';
 
 /// Service for crop disease analysis.
 ///
@@ -137,7 +138,12 @@ class CropService {
         severityDescription: severityDescription,
       );
 
-      // Save to history
+      // Save to history (SQLite - US 24)
+      if (!kIsWeb) {
+        await databaseService.saveDiagnosis(finalResult);
+      }
+      
+      // Keep SharedPreferences save for current session if needed
       await preferencesService.saveAnalysisResult(finalResult.toJson());
 
       return finalResult;

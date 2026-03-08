@@ -7,6 +7,12 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../models/analysis_result.dart';
 import '../widgets/crop_advice_card.dart';
 import '../services/feedback_service.dart';
+import '../services/explanation_service.dart';
+import '../services/preferences_service.dart';
+import '../services/tts_service.dart';
+import '../widgets/treatment_steps_widget.dart';
+import 'chatbot_view.dart';
+import 'dart:developer' as dev;
 
 /// Full-screen diagnosis result screen (US17-20).
 ///
@@ -48,6 +54,10 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
   final TextEditingController _commentController = TextEditingController();
   bool _feedbackSubmitted = false;
   bool _feedbackSubmitting = false;
+  
+  // US23: Voice output state
+  bool _voiceEnabled = true;
+  bool _isSpeaking = false;
 
   @override
   void initState() {
@@ -71,6 +81,40 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
     Future.delayed(const Duration(milliseconds: 300), () {
       if (mounted) _confidenceAnimController.forward();
     });
+
+    _loadVoicePreference();
+  }
+
+  Future<void> _loadVoicePreference() async {
+    final enabled = await preferencesService.isVoiceEnabled();
+    if (mounted) {
+      setState(() => _voiceEnabled = enabled);
+      if (_voiceEnabled) {
+        _startVoiceOverview();
+      }
+    }
+  }
+
+  Future<void> _startVoiceOverview() async {
+    if (!_voiceEnabled) return;
+    
+    setState(() => _isSpeaking = true);
+    final explanation = ExplanationService.formatForSpeech(widget.result);
+    final lang = await preferencesService.getLanguage() ?? 'en-US';
+    
+    await TTSService.speakText(explanation, lang);
+    if (mounted) setState(() => _isSpeaking = false);
+  }
+
+  void _toggleVoice() async {
+    final newState = !_voiceEnabled;
+    setState(() => _voiceEnabled = newState);
+    await preferencesService.setVoiceEnabled(newState);
+    if (!newState) {
+      await TTSService.stop();
+    } else {
+      _startVoiceOverview();
+    }
   }
 
   @override
@@ -160,6 +204,10 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
           physics: const BouncingScrollPhysics(),
           slivers: [
             _buildImageHeader(),
+            if (widget.result.confidence < 0.70)
+              SliverToBoxAdapter(
+                child: _buildUncertaintyBanner(),
+              ),
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
@@ -168,8 +216,14 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
                   children: [
                     const SizedBox(height: 8),
                     _buildDiseaseIdentificationCard(),
+                    const SizedBox(height: 12),
+                    _buildSimpleExplanationCard(),
                     const SizedBox(height: 20),
                     _buildMetricsRow(),
+                    const SizedBox(height: 24),
+                    _buildMultipleDetectionsView(),
+                    const SizedBox(height: 24),
+                    _buildTreatmentStepsSection(),
                     const SizedBox(height: 24),
                     _buildTopPredictionsChart(),
                     const SizedBox(height: 24),
@@ -445,6 +499,83 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
     );
   }
 
+  // ==================== SIMPLE EXPLANATION (US23) ====================
+
+  Widget _buildSimpleExplanationCard() {
+    final simpleExp = ExplanationService.getSimpleExplanation(widget.result.disease);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.06)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(LucideIcons.sparkles, size: 16, color: Colors.purple.shade300),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Simple Explanation',
+                    style: TextStyle(
+                      color: Colors.purple.shade300,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              // US23: Voice Toggle
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onPressed: _toggleVoice,
+                icon: Icon(
+                  _voiceEnabled ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+                  color: _voiceEnabled ? const Color(0xFF10B981) : Colors.white24,
+                  size: 20,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            simpleExp,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 15,
+              height: 1.5,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==================== TREATMENT STEPS (US25) ====================
+
+  Widget _buildTreatmentStepsSection() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF10B981).withOpacity(0.05),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFF10B981).withOpacity(0.1)),
+      ),
+      child: TreatmentStepsWidget(
+        steps: widget.result.treatmentSteps,
+        themeColor: const Color(0xFF10B981),
+      ),
+    );
+  }
+
   // ==================== CONFIDENCE + SEVERITY METRICS (US18 + US19) ====================
 
   Widget _buildMetricsRow() {
@@ -618,6 +749,105 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
 
   // ==================== TOP-5 PREDICTIONS CHART (US18) ====================
 
+  // ==================== MULTIPLE DETECTIONS (US22) ====================
+
+  Widget _buildMultipleDetectionsView() {
+    final predictions = widget.result.topPredictions;
+    if (predictions.length < 2) return const SizedBox.shrink();
+
+    // Significant secondary diseases (e.g., confidence > 25%)
+    final secondaries = predictions.skip(1).where((p) => (p['confidence'] as num? ?? 0) > 0.25).toList();
+
+    if (secondaries.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(LucideIcons.binary, size: 18, color: Color(0xFFF472B6)),
+            const SizedBox(width: 8),
+            Text(
+              'Co-occurring Conditions',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ...secondaries.map((p) => _buildSecondaryDetectionCard(p)).toList(),
+      ],
+    );
+  }
+
+  Widget _buildSecondaryDetectionCard(Map<String, dynamic> pred) {
+    final disease = pred['disease'] as String? ?? 'Unknown Condition';
+    final conf = (pred['confidence'] as num? ?? 0).toDouble();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF472B6).withOpacity(0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFF472B6).withOpacity(0.2)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF472B6).withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(LucideIcons.alertCircle, color: Color(0xFFF472B6), size: 16),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  disease,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  'Possible co-infection found',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.5),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.black26,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              '${(conf * 100).toInt()}%',
+              style: const TextStyle(
+                color: Color(0xFFF472B6),
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTopPredictionsChart() {
     final predictions = widget.result.topPredictions;
     if (predictions.isEmpty) return const SizedBox.shrink();
@@ -740,6 +970,115 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
           ),
         ),
       ],
+    );
+  }
+
+  // ==================== UNCERTAINTY WARNING (US21) ====================
+
+  Widget _buildUncertaintyBanner() {
+    // Task: Log low-confidence predictions for monitoring
+    dev.log(
+      'Low confidence prediction detected',
+      name: 'CropAID.Diagnosis',
+      error: {'id': widget.result.id, 'disease': widget.result.disease, 'confidence': widget.result.confidence},
+    );
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF59E0B).withOpacity(0.12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF59E0B).withOpacity(0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.warning_amber_rounded,
+                    color: Color(0xFFFBBF24), size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Uncertain Diagnosis',
+                      style: TextStyle(
+                        color: Color(0xFFFBBF24),
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      'AI confidence is lower than usual. Please verify results.',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: widget.onClose,
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text('Retry Capture'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: BorderSide(color: Colors.white.withOpacity(0.2)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _openExpertConsult,
+                  icon: const Icon(LucideIcons.bot, size: 18),
+                  label: const Text('Expert Consult'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFF59E0B),
+                    foregroundColor: Colors.black87,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openExpertConsult() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ChatbotView(
+        onClose: () => Navigator.pop(context),
+      ),
     );
   }
 
