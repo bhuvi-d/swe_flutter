@@ -76,7 +76,8 @@ class CropService {
 
     // 3. Handle explicit AI rejection (e.g., non-leaf)
     if (prediction != null && prediction["success"] == false) {
-      final errorMsg = prediction["error"] ?? "Could not identify a leaf in the image.";
+      // Use the specific human-readable message from the backend gates
+      final errorMsg = prediction["message"] ?? prediction["error"] ?? "Could not identify a leaf in the image.";
       throw Exception(errorMsg);
     }
 
@@ -85,11 +86,7 @@ class CropService {
       // 5. Extract the prediction
       final int classIndex = prediction["class_index"];
       final double confidence = prediction["confidence"];
-
-      // 6. Strict Confidence Threshold
-      if (confidence < 0.50) {
-        throw Exception("Low confidence detection (${(confidence * 100).toStringAsFixed(0)}%). Please retake the photo with better lighting and ensure the leaf is centered.");
-      }
+      // Note: Confidence threshold is now handled purely on the backend.
 
       // 7. Use server-provided class name or fall back to local mapping
       final String diseaseName = prediction["class_name"] ?? classLabels[classIndex];

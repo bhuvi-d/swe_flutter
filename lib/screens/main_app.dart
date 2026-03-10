@@ -314,27 +314,12 @@ class _MainAppState extends State<MainApp> {
               
               final errorStr = e.toString();
               
-              // Handle identification failures (Low confidence or Non-leaf) with a clear dialog
-              if (errorStr.contains('confidence') || errorStr.contains('identify a leaf')) {
-                 showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Row(
-                      children: [
-                        Icon(Icons.warning_amber_rounded, color: AppColors.error),
-                        SizedBox(width: 10),
-                        Text('Identification Failed'),
-                      ],
-                    ),
-                    content: Text(errorStr.replaceFirst('Exception: ', '')),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Try Again'),
-                      ),
-                    ],
-                  ),
-                );
+              // Handle identification failures (Low confidence, Non-leaf, or Drawing) with a bottom sheet
+              if (errorStr.contains('confidence') || 
+                  errorStr.contains('leaf') ||
+                  errorStr.contains('drawing') || 
+                  errorStr.contains('illustration')) {
+                 _showErrorBottomSheet(context, errorStr.replaceFirst('Exception: ', ''));
                 return;
               }
 
@@ -429,26 +414,11 @@ class _MainAppState extends State<MainApp> {
               Navigator.pop(context); // Hide loading
               
               final errorStr = e.toString();
-              if (errorStr.contains('confidence') || errorStr.contains('identify a leaf')) {
-                 showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Row(
-                      children: [
-                        Icon(Icons.warning_amber_rounded, color: AppColors.error),
-                        SizedBox(width: 10),
-                        Text('Identification Failed'),
-                      ],
-                    ),
-                    content: Text(errorStr.replaceFirst('Exception: ', '')),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Try Again'),
-                      ),
-                    ],
-                  ),
-                );
+              if (errorStr.contains('confidence') || 
+                  errorStr.contains('leaf') ||
+                  errorStr.contains('drawing') || 
+                  errorStr.contains('illustration')) {
+                 _showErrorBottomSheet(context, errorStr.replaceFirst('Exception: ', ''));
                 return;
               }
 
@@ -550,7 +520,7 @@ class _MainAppState extends State<MainApp> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
+               Container(
                 padding: const EdgeInsets.all(32),
                 decoration: BoxDecoration(
                   color: AppColors.nature100,
@@ -574,6 +544,114 @@ class _MainAppState extends State<MainApp> {
                 'Coming soon...',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: AppColors.gray500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showErrorBottomSheet(BuildContext context, String errorText) {
+    // Determine icon and theme based on error type
+    final isDrawing = errorText.toLowerCase().contains('drawing') || errorText.toLowerCase().contains('illustration');
+    final isNotLeaf = errorText.toLowerCase().contains('leaf');
+    
+    IconData icon;
+    Color color;
+    String title;
+    
+    if (isDrawing) {
+      icon = Icons.brush;
+      color = Colors.orange;
+      title = 'Illustration Detected';
+    } else if (isNotLeaf) {
+      icon = Icons.nature_people_outlined;
+      color = Colors.redAccent;
+      title = 'Not a Plant Leaf';
+    } else {
+      icon = Icons.center_focus_weak;
+      color = AppColors.nature600;
+      title = 'Low Confidence';
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 48,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 24),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 48, color: color),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.gray900,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                errorText,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 16,
+                  height: 1.5,
+                  color: AppColors.gray600,
+                ),
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                height: 54,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    if (_currentView != 'camera' && _currentView != 'upload') {
+                       _navigateTo('camera');
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.nature600,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    'Try Again',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ),
             ],
