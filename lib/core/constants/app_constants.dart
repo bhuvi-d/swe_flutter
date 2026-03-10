@@ -42,7 +42,8 @@ class AppConstants {
 
   // API
   // static const String baseApiUrl = 'https://your-api-url.com';
-  // Use local backend for development
-  static const String baseApiUrl = 'http://localhost:5000';
+  // static const String baseApiUrl = 'http://localhost:5000';
+  // Use production backend deployed on Render
+  static const String baseApiUrl = 'https://swe-ai-crop-back-kfkg.onrender.com';
   static const Duration apiTimeout = Duration(seconds: 30);
 }
