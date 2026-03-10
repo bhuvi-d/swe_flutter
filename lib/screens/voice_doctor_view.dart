@@ -1,433 +1,720 @@
-import 'package:flutter/material.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
-import 'package:lucide_icons/lucide_icons.dart';
-import '../core/utils/responsive_layout.dart';
-import '../services/audio_service.dart';
-import '../services/chat_service.dart';
-import '../core/localization/translation_service.dart';
+import 'dart:async';
+import 'dart:typed_data';
 
-/// Voice Doctor View — Premium dark theme with real AI and responsive layout.
+import 'package:flutter/material.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
+
+import '../services/voice_chat_service.dart';
+
+// ─── Language config ────────────────────────────────────────────────────────
+class _Lang {
+  final String code;    // 2-letter code sent to backend
+  final String name;    // Display name in that script
+  final String locale;  // speech_to_text locale id
+  const _Lang(this.code, this.name, this.locale);
+}
+
+const List<_Lang> _kLangs = [
+  _Lang('en', 'English',   'en_IN'),
+  _Lang('hi', 'हिन्दी',     'hi_IN'),
+  _Lang('te', 'తెలుగు',    'te_IN'),
+  _Lang('ta', 'தமிழ்',     'ta_IN'),
+  _Lang('kn', 'ಕನ್ನಡ',    'kn_IN'),
+  _Lang('ml', 'മലയാളം',   'ml_IN'),
+  _Lang('bn', 'বাংলা',     'bn_IN'),
+  _Lang('mr', 'मराठी',     'mr_IN'),
+];
+
+// ─── Message model ──────────────────────────────────────────────────────────
+enum _Role { user, ai }
+
+class _Msg {
+  final _Role     role;
+  final String    text;
+  final Uint8List? audio;
+  final DateTime  time;
+  _Msg({required this.role, required this.text, this.audio})
+      : time = DateTime.now();
+}
+
+// ─── View ───────────────────────────────────────────────────────────────────
+
+/// Voice Doctor — multilingual voice chatbot.
 ///
-/// US14: Voice input for symptom description with language selection.
-/// US16: Confirmation of captured input.
+/// 1. User picks a language from the pill row.
+/// 2. Taps & holds the mic → device STT transcribes speech in that language.
+/// 3. On release, transcript is sent to /api/speech/text-chat.
+/// 4. Backend: Gemini LLM answers → translated to user's language → Sarvam TTS.
+/// 5. Answer is shown as a chat bubble and the audio auto-plays.
 class VoiceDoctorView extends StatefulWidget {
   final VoidCallback? onBack;
-
   const VoiceDoctorView({super.key, this.onBack});
 
   @override
   State<VoiceDoctorView> createState() => _VoiceDoctorViewState();
 }
 
-class _VoiceDoctorViewState extends State<VoiceDoctorView> with SingleTickerProviderStateMixin {
-  final stt.SpeechToText _speech = stt.SpeechToText();
+class _VoiceDoctorViewState extends State<VoiceDoctorView>
+    with SingleTickerProviderStateMixin {
+
+  // ── Language ──────────────────────────────────────────────────────────────
+  int _langIdx = 0;
+  _Lang get _lang => _kLangs[_langIdx];
+
+  // ── STT ───────────────────────────────────────────────────────────────────
+  final stt.SpeechToText _stt = stt.SpeechToText();
+  bool _sttReady    = false;
   bool _isListening = false;
-  String _transcript = '';
-  String _response = '';
-  bool _isAnalyzing = false;
-  bool _isInitialized = false;
-  late AnimationController _pulseController;
+  String _liveText  = '';   // live partial transcript
 
-  String _selectedLocale = 'en_US';
-  List<stt.LocaleName> _availableLocales = [];
+  // ── Chat ──────────────────────────────────────────────────────────────────
+  final List<_Msg> _msgs = [];
+  bool _isProcessing = false;
 
-  final Map<String, String> _localeOptions = {
-    'en_US': 'English',
-    'hi_IN': 'Hindi',
-    'te_IN': 'Telugu',
-    'ta_IN': 'Tamil',
-    'kn_IN': 'Kannada',
-    'mr_IN': 'Marathi',
-    'bn_IN': 'Bengali',
-  };
+  // ── Audio playback ────────────────────────────────────────────────────────
+  final AudioPlayer _player = AudioPlayer();
+  String? _playingId;
 
+  // ── Scroll ────────────────────────────────────────────────────────────────
+  final ScrollController _scroll = ScrollController();
+
+  // ── Pulse animation ───────────────────────────────────────────────────────
+  late AnimationController _pulse;
+
+  // ─────────────────────────────────────────────────────────────────────────
   @override
   void initState() {
     super.initState();
-    _pulseController = AnimationController(
+    _pulse = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 900),
     )..repeat(reverse: true);
-    _initSpeech();
-  }
-
-  Future<void> _initSpeech() async {
-    try {
-      final available = await _speech.initialize(
-        onStatus: (status) {
-          if (status == 'done' || status == 'notListening') {
-            if (mounted) setState(() => _isListening = false);
-          }
-        },
-        onError: (error) {
-          debugPrint('STT Error: $error');
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Speech error: ${error.errorMsg}')),
-            );
-          }
-        },
-      );
-
-      if (available) {
-        final locales = await _speech.locales();
-        if (mounted) {
-          setState(() {
-            _isInitialized = true;
-            _availableLocales = locales;
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint('STT Init Error: $e');
-    }
+    _initSTT();
   }
 
   @override
   void dispose() {
-    _pulseController.dispose();
-    _speech.stop();
+    _pulse.dispose();
+    _stt.stop();
+    _player.dispose();
+    _scroll.dispose();
     super.dispose();
   }
 
-  void _toggleListening() async {
-    if (_isListening) {
-      await _speech.stop();
-      setState(() => _isListening = false);
-      if (_transcript.isNotEmpty) _analyzeSymptoms();
-    } else {
-      if (!_isInitialized) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Speech recognition not available')),
-        );
-        return;
-      }
-
-      setState(() {
-        _isListening = true;
-        _transcript = '';
-        _response = '';
-      });
-
-      await _speech.listen(
-        onResult: (result) {
-          setState(() => _transcript = result.recognizedWords);
-        },
-        localeId: _selectedLocale,
-        listenFor: const Duration(seconds: 30),
-        pauseFor: const Duration(seconds: 3),
-      );
-    }
+  Future<void> _initSTT() async {
+    final ok = await _stt.initialize(
+      onError: (e) => debugPrint('[STT] error: $e'),
+      onStatus: (s) {
+        if (s == 'done' || s == 'notListening') {
+          if (mounted && _isListening) _onSpeechDone();
+        }
+      },
+    );
+    if (mounted) setState(() => _sttReady = ok);
   }
 
-  Future<void> _analyzeSymptoms() async {
-    setState(() => _isAnalyzing = true);
+  // ─── Mic tap ─────────────────────────────────────────────────────────────
+  void _onMicTap() {
+    if (_isProcessing) return;
+    _isListening ? _stopListening() : _startListening();
+  }
+
+  void _startListening() async {
+    if (!_sttReady) {
+      _showSnack('Speech recognition not available on this device.');
+      return;
+    }
+    setState(() {
+      _isListening = true;
+      _liveText = '';
+    });
+    await _stt.listen(
+      onResult: (r) {
+        if (mounted) setState(() => _liveText = r.recognizedWords);
+        if (r.finalResult && r.recognizedWords.isNotEmpty) {
+          _stopListening();
+        }
+      },
+      localeId: _lang.locale,
+      listenFor: const Duration(seconds: 30),
+      pauseFor: const Duration(seconds: 3),
+      cancelOnError: true,
+    );
+  }
+
+  void _stopListening() async {
+    await _stt.stop();
+    if (mounted) setState(() => _isListening = false);
+    _onSpeechDone();
+  }
+
+  void _onSpeechDone() {
+    final text = _liveText.trim();
+    setState(() => _liveText = '');
+    if (text.isEmpty) return;
+    _sendMessage(text);
+  }
+
+  // ─── Send message ─────────────────────────────────────────────────────────
+  Future<void> _sendMessage(String text) async {
+    _addMsg(_Msg(role: _Role.user, text: text));
+    _scrollToBottom();
+
+    setState(() => _isProcessing = true);
 
     try {
-      // Use real AI via ChatService
-      final aiResponse = await ChatService.getResponse(
-        "A farmer describes the following crop symptoms: '$_transcript'. "
-        "Provide a brief diagnosis and recommended treatment in 3-4 sentences."
+      final result = await VoiceChatService.sendTextMessage(
+        transcript: text,
+        langCode: _lang.code,
       );
-      if (mounted) {
-        setState(() {
-          _isAnalyzing = false;
-          _response = aiResponse;
-        });
-        audioService.confirmAction('success');
-        audioService.speak(_response);
+
+      final aiMsg = _Msg(
+        role: _Role.ai,
+        text: result.answer,
+        audio: result.audioData,
+      );
+      _addMsg(aiMsg);
+      _scrollToBottom();
+
+      if (result.audioData != null) {
+        await _playAudio(result.audioData!, id: aiMsg.hashCode.toString());
       }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isAnalyzing = false;
-          _response = "I couldn't analyze that right now. Please try again or describe your symptoms differently.";
-        });
-      }
+    } on Exception catch (e) {
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      _addMsg(_Msg(role: _Role.ai, text: '⚠️ $msg'));
+      _scrollToBottom();
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
     }
   }
 
-  void _clearAndRetry() {
-    setState(() {
-      _transcript = '';
-      _response = '';
+  // ─── Audio ────────────────────────────────────────────────────────────────
+  Future<void> _playAudio(Uint8List bytes, {required String id}) async {
+    await _player.stop();
+    if (mounted) setState(() => _playingId = id);
+    try {
+      await _player.play(BytesSource(bytes));
+      await _player.onPlayerComplete.first;
+    } catch (_) {}
+    if (mounted) setState(() => _playingId = null);
+  }
+
+  // ─── Helpers ──────────────────────────────────────────────────────────────
+  void _addMsg(_Msg m) { if (mounted) setState(() => _msgs.add(m)); }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scroll.hasClients) {
+        _scroll.animateTo(
+          _scroll.position.maxScrollExtent + 160,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeOut,
+        );
+      }
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0F1A2E),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
-          onPressed: widget.onBack ?? () => Navigator.pop(context),
-          color: Colors.white70,
-        ),
-        title: Text(
-          context.t('voiceView.title'),
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-      ),
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF0F1A2E), Color(0xFF1A2940)],
-          ),
-        ),
-        child: SafeArea(
-          child: SingleChildScrollView(
-            child: ResponsiveBody(
-              child: Column(
-                children: [
-                  const SizedBox(height: 10),
-                  _buildLanguageSelector(),
-                  const SizedBox(height: 40),
-                  _buildMicButton(),
-                  const SizedBox(height: 20),
-                  // Status text
-                  Text(
-                    _isListening
-                        ? context.t('voiceView.listening')
-                        : (_isInitialized ? context.t('voiceView.tapToSpeak') : 'Initializing...'),
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: _isListening ? const Color(0xFF10B981) : Colors.white54,
-                    ),
-                  ),
-                  if (_isListening)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: _buildWaveformIndicator(),
-                    ),
-                  const SizedBox(height: 36),
-                  if (_transcript.isNotEmpty) _buildTranscriptCard(),
-                  if (_isAnalyzing)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 30),
-                      child: CircularProgressIndicator(color: Color(0xFF10B981)),
-                    )
-                  else if (_response.isNotEmpty) ...[
-                    const SizedBox(height: 20),
-                    _buildResponseCard(),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: _clearAndRetry,
-                        icon: const Icon(LucideIcons.refreshCcw, size: 18),
-                        label: const Text('Ask Again'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF10B981),
-                          side: BorderSide(color: const Color(0xFF10B981).withOpacity(0.4)),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        ),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 40),
-                ],
-              ),
-            ),
-          ),
-        ),
+  void _showSnack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xFF1E3A5F),
       ),
     );
   }
 
-  Widget _buildLanguageSelector() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
-      ),
-      child: Row(
+  // ─────────────────────────────────────────────────────────────────────────
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0A1628),
+      appBar: _appBar(),
+      body: Column(
         children: [
-          const Icon(LucideIcons.globe, color: Color(0xFF38BDF8), size: 20),
-          const SizedBox(width: 12),
-          Text('Language:', style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 14)),
-          const SizedBox(width: 12),
-          Expanded(
-            child: DropdownButton<String>(
-              value: _selectedLocale,
-              isExpanded: true,
-              underline: const SizedBox(),
-              dropdownColor: const Color(0xFF1E2D45),
-              style: const TextStyle(color: Colors.white, fontSize: 14),
-              iconEnabledColor: Colors.white54,
-              onChanged: (value) {
-                if (value != null) setState(() => _selectedLocale = value);
-              },
-              items: _localeOptions.entries.map((entry) {
-                return DropdownMenuItem(
-                  value: entry.key,
-                  child: Text(entry.value),
-                );
-              }).toList(),
-            ),
-          ),
+          _langBar(),
+          Expanded(child: _chatArea()),
+          _micBar(),
         ],
       ),
     );
   }
 
-  Widget _buildMicButton() {
-    return GestureDetector(
-      onTap: _toggleListening,
-      child: AnimatedBuilder(
-        animation: _pulseController,
-        builder: (context, child) {
-          final scale = _isListening ? (1.0 + 0.08 * _pulseController.value) : 1.0;
-          final glowRadius = _isListening ? 30.0 + 15.0 * _pulseController.value : 20.0;
-          return Transform.scale(
-            scale: scale,
-            child: Container(
-              width: 130,
-              height: 130,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: _isListening
-                      ? [const Color(0xFFEF4444), const Color(0xFFDC2626)]
-                      : [const Color(0xFF10B981), const Color(0xFF059669)],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: (_isListening ? const Color(0xFFEF4444) : const Color(0xFF10B981))
-                        .withOpacity(0.35),
-                    blurRadius: glowRadius,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
-              child: Icon(
-                _isListening ? Icons.stop_rounded : Icons.mic_rounded,
-                size: 52,
-                color: Colors.white,
+  // ─── AppBar ───────────────────────────────────────────────────────────────
+  PreferredSizeWidget _appBar() => AppBar(
+    backgroundColor: const Color(0xFF0D1B2E),
+    elevation: 0,
+    leading: IconButton(
+      icon: const Icon(Icons.arrow_back_ios_new, size: 20, color: Colors.white70),
+      onPressed: widget.onBack ?? () => Navigator.pop(context),
+    ),
+    title: Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(7),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(colors: [Color(0xFF10B981), Color(0xFF059669)]),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: const Icon(LucideIcons.mic, size: 18, color: Colors.white),
+        ),
+        const SizedBox(width: 10),
+        const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Voice Doctor',
+                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+            Text('Sarvam AI · Gemini',
+                style: TextStyle(color: Colors.white38, fontSize: 10)),
+          ],
+        ),
+      ],
+    ),
+    actions: [
+      if (_msgs.isNotEmpty)
+        IconButton(
+          icon: const Icon(LucideIcons.trash2, size: 18, color: Colors.white30),
+          tooltip: 'Clear chat',
+          onPressed: () => setState(() => _msgs.clear()),
+        ),
+    ],
+  );
+
+  // ─── Language pills ───────────────────────────────────────────────────────
+  Widget _langBar() => Container(
+    height: 50,
+    color: const Color(0xFF0D1B2E),
+    child: ListView.builder(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      itemCount: _kLangs.length,
+      itemBuilder: (_, i) {
+        final sel = i == _langIdx;
+        return GestureDetector(
+          onTap: () => setState(() => _langIdx = i),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            margin: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+            decoration: BoxDecoration(
+              gradient: sel
+                  ? const LinearGradient(colors: [Color(0xFF10B981), Color(0xFF059669)])
+                  : null,
+              color: sel ? null : Colors.white.withOpacity(0.06),
+              borderRadius: BorderRadius.circular(20),
+              border: sel ? null : Border.all(color: Colors.white.withOpacity(0.1)),
+            ),
+            child: Text(
+              _kLangs[i].name,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: sel ? FontWeight.bold : FontWeight.normal,
+                color: sel ? Colors.white : Colors.white54,
               ),
             ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildWaveformIndicator() {
-    return AnimatedBuilder(
-      animation: _pulseController,
-      builder: (context, _) {
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(7, (i) {
-            final offset = (i - 3).abs() * 0.15;
-            final height = 8 + 14 * ((_pulseController.value + offset) % 1.0);
-            return Container(
-              margin: const EdgeInsets.symmetric(horizontal: 2),
-              width: 4,
-              height: height,
-              decoration: BoxDecoration(
-                color: const Color(0xFF10B981).withOpacity(0.6),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            );
-          }),
+          ),
         );
+      },
+    ),
+  );
+
+  // ─── Chat area ────────────────────────────────────────────────────────────
+  Widget _chatArea() {
+    if (_msgs.isEmpty && !_isListening && !_isProcessing) return _emptyState();
+    return ListView.builder(
+      controller: _scroll,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      itemCount: _msgs.length + (_isProcessing ? 1 : 0) + (_isListening ? 1 : 0),
+      itemBuilder: (_, i) {
+        // Live listening bubble at top if listening
+        if (_isListening && i == 0 && _msgs.isEmpty) return _listeningBubble();
+        final offset = _isListening && _msgs.isEmpty ? 1 : 0;
+        if (_isProcessing && i == _msgs.length + offset) return _thinkingBubble();
+        if (_isListening && i == _msgs.length) return _listeningBubble();
+        return _bubble(_msgs[i - offset]);
       },
     );
   }
 
-  Widget _buildTranscriptCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFF818CF8).withOpacity(0.2)),
-      ),
+  Widget _emptyState() => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(36),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
+          AnimatedBuilder(
+            animation: _pulse,
+            builder: (_, __) => Transform.scale(
+              scale: 1.0 + 0.04 * _pulse.value,
+              child: Container(
+                width: 96,
+                height: 96,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF818CF8).withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(8),
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF10B981), Color(0xFF059669)],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF10B981).withOpacity(0.3),
+                      blurRadius: 32, spreadRadius: 2,
+                    ),
+                  ],
                 ),
-                child: const Icon(LucideIcons.user, size: 16, color: Color(0xFF818CF8)),
+                child: const Icon(Icons.mic_rounded, size: 44, color: Colors.white),
               ),
-              const SizedBox(width: 10),
-              const Text(
-                'You said',
-                style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF818CF8), fontSize: 14),
-              ),
-            ],
+            ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 28),
           Text(
-            _transcript,
-            style: TextStyle(fontSize: 15, color: Colors.white.withOpacity(0.8), height: 1.5),
+            'Ask anything about your crops',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.white.withOpacity(0.85),
+            ),
+            textAlign: TextAlign.center,
           ),
+          const SizedBox(height: 10),
+          Text(
+            'Speak in ${_lang.name} — I\'ll reply in ${_lang.name}\nwith voice & text',
+            style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.38), height: 1.6),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 32),
+          ...[
+            '🌿 My tomato leaves have yellow spots',
+            '🪲 How can I remove pests without chemicals?',
+            '💧 When should I water my rice crop?',
+          ].map((s) => Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: const Color(0xFF10B981).withOpacity(0.18)),
+              ),
+              child: Text(s,
+                style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.5)),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          )),
+        ],
+      ),
+    ),
+  );
+
+  // ─── Bubbles ──────────────────────────────────────────────────────────────
+  Widget _bubble(_Msg msg) {
+    final isUser = msg.role == _Role.user;
+    final id = msg.hashCode.toString();
+    final playing = _playingId == id;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        children: [
+          if (!isUser) ...[_ava(false), const SizedBox(width: 8)],
+          Flexible(
+            child: Column(
+              crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    gradient: isUser
+                        ? const LinearGradient(
+                            colors: [Color(0xFF3B82F6), Color(0xFF2563EB)],
+                            begin: Alignment.topLeft, end: Alignment.bottomRight,
+                          )
+                        : null,
+                    color: isUser ? null : const Color(0xFF162032),
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(18),
+                      topRight: const Radius.circular(18),
+                      bottomLeft: Radius.circular(isUser ? 18 : 4),
+                      bottomRight: Radius.circular(isUser ? 4 : 18),
+                    ),
+                    border: isUser ? null
+                        : Border.all(color: const Color(0xFF10B981).withOpacity(0.14)),
+                    boxShadow: [BoxShadow(
+                      color: (isUser ? const Color(0xFF3B82F6) : const Color(0xFF10B981))
+                          .withOpacity(0.10),
+                      blurRadius: 12, offset: const Offset(0, 4),
+                    )],
+                  ),
+                  child: Text(msg.text,
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      color: Colors.white.withOpacity(isUser ? 0.95 : 0.85),
+                      height: 1.55,
+                    ),
+                  ),
+                ),
+                // Play button on AI messages
+                if (!isUser && msg.audio != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: GestureDetector(
+                      onTap: () => _playAudio(msg.audio!, id: id),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: playing
+                              ? const Color(0xFF10B981).withOpacity(0.14)
+                              : Colors.white.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: playing
+                              ? const Color(0xFF10B981).withOpacity(0.5)
+                              : Colors.white.withOpacity(0.09)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              playing ? Icons.stop_rounded : Icons.play_arrow_rounded,
+                              size: 16,
+                              color: playing ? const Color(0xFF10B981) : Colors.white.withOpacity(0.4),
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              playing ? 'Playing…' : 'Play voice',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: playing ? const Color(0xFF10B981) : Colors.white.withOpacity(0.3),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 4),
+                Text(
+                  '${msg.time.hour.toString().padLeft(2,'0')}:${msg.time.minute.toString().padLeft(2,'0')}',
+                  style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.22)),
+                ),
+              ],
+            ),
+          ),
+          if (isUser) ...[const SizedBox(width: 8), _ava(true)],
         ],
       ),
     );
   }
 
-  Widget _buildResponseCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFF10B981).withOpacity(0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+  Widget _listeningBubble() => Padding(
+    padding: const EdgeInsets.only(bottom: 14),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [Color(0xFF10B981), Color(0xFF059669)]),
-                  borderRadius: BorderRadius.circular(10),
+                  color: const Color(0xFF1E3A5F),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(18),
+                    topRight: Radius.circular(18),
+                    bottomLeft: Radius.circular(18),
+                    bottomRight: Radius.circular(4),
+                  ),
+                  border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3)),
                 ),
-                child: const Icon(LucideIcons.brain, size: 18, color: Colors.white),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                context.t('voiceView.aiDoctor'),
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: Color(0xFF10B981),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedBuilder(
+                      animation: _pulse,
+                      builder: (_, __) => Container(
+                        width: 8, height: 8,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Color.lerp(const Color(0xFFEF4444), const Color(0xFFFF6B6B), _pulse.value),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        _liveText.isEmpty ? 'Listening in ${_lang.name}…' : _liveText,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.white.withOpacity(_liveText.isEmpty ? 0.5 : 0.9),
+                          fontStyle: _liveText.isEmpty ? FontStyle.italic : FontStyle.normal,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Text(
-            _response,
-            style: TextStyle(fontSize: 15, color: Colors.white.withOpacity(0.8), height: 1.6),
+        ),
+        const SizedBox(width: 8),
+        _ava(true),
+      ],
+    ),
+  );
+
+  Widget _thinkingBubble() => Padding(
+    padding: const EdgeInsets.only(bottom: 14),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        _ava(false),
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          decoration: BoxDecoration(
+            color: const Color(0xFF162032),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(18), topRight: Radius.circular(18),
+              bottomRight: Radius.circular(18), bottomLeft: Radius.circular(4),
+            ),
+            border: Border.all(color: const Color(0xFF10B981).withOpacity(0.12)),
           ),
-        ],
+          child: AnimatedBuilder(
+            animation: _pulse,
+            builder: (_, __) => Row(
+              mainAxisSize: MainAxisSize.min,
+              children: List.generate(3, (i) {
+                final v = ((_pulse.value + i * 0.25) % 1.0);
+                return Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  width: 6, height: 6 + 8 * v,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                );
+              }),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text('Thinking…',
+          style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.28))),
+      ],
+    ),
+  );
+
+  Widget _ava(bool isUser) => Container(
+    width: 30, height: 30,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      gradient: LinearGradient(
+        colors: isUser
+            ? [const Color(0xFF3B82F6), const Color(0xFF2563EB)]
+            : [const Color(0xFF10B981), const Color(0xFF059669)],
       ),
-    );
-  }
+    ),
+    child: Icon(isUser ? LucideIcons.user : LucideIcons.brain, size: 15, color: Colors.white),
+  );
+
+  // ─── Mic bar ──────────────────────────────────────────────────────────────
+  Widget _micBar() => Container(
+    padding: const EdgeInsets.fromLTRB(24, 14, 24, 30),
+    decoration: BoxDecoration(
+      color: const Color(0xFF0D1B2E),
+      border: Border(top: BorderSide(color: Colors.white.withOpacity(0.06))),
+    ),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_isListening) ...[
+          // Waveform
+          AnimatedBuilder(
+            animation: _pulse,
+            builder: (_, __) => Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(13, (i) {
+                final c = (i - 6).abs() * 0.1;
+                final h = 4.0 + 24.0 * ((_pulse.value + c * 1.8) % 1.0);
+                return Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                  width: 3, height: h,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEF4444).withOpacity(0.75),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                );
+              }),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        // Mic button
+        GestureDetector(
+          onTap: _onMicTap,
+          child: AnimatedBuilder(
+            animation: _pulse,
+            builder: (_, __) {
+              final s = _isListening ? 1.0 + 0.06 * _pulse.value : 1.0;
+              final g = _isListening ? 28.0 + 14.0 * _pulse.value
+                  : (_isProcessing ? 10.0 : 18.0);
+              return Transform.scale(
+                scale: s,
+                child: Container(
+                  width: 70,
+                  height: 70,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: _isProcessing
+                          ? [const Color(0xFF475569), const Color(0xFF334155)]
+                          : _isListening
+                              ? [const Color(0xFFEF4444), const Color(0xFFDC2626)]
+                              : [const Color(0xFF10B981), const Color(0xFF059669)],
+                    ),
+                    boxShadow: [BoxShadow(
+                      color: (_isListening
+                              ? const Color(0xFFEF4444)
+                              : const Color(0xFF10B981))
+                          .withOpacity(_isProcessing ? 0.08 : 0.38),
+                      blurRadius: g, spreadRadius: 2,
+                    )],
+                  ),
+                  child: _isProcessing
+                      ? const Padding(
+                          padding: EdgeInsets.all(22),
+                          child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                        )
+                      : Icon(
+                          _isListening ? Icons.stop_rounded : Icons.mic_rounded,
+                          size: 30, color: Colors.white,
+                        ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          _isProcessing
+              ? 'Getting answer from Gemini…'
+              : _isListening
+                  ? 'Tap ■ to stop  •  Speak clearly'
+                  : _sttReady
+                      ? 'Tap to speak in ${_lang.name}'
+                      : 'Initialising microphone…',
+          style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.32)),
+        ),
+      ],
+    ),
+  );
 }

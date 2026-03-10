@@ -1,4 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Mic permission — required for Sarvam STT voice recording -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <!-- Internet — required for Sarvam AI + backend API calls -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Microphone feature declaration -->
+    <uses-feature android:name="android.hardware.microphone" android:required="false"/>
     <application
         android:label="swe_flutter"
         android:name="${applicationName}"
