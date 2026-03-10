@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import '../core/constants/app_constants.dart';
 
 /// Service for submitting and retrieving treatment feedback (US32).
 ///
@@ -9,7 +10,8 @@ import 'package:http/http.dart' as http;
 /// - Feedback retrieval by diagnosis ID
 class FeedbackService {
   // Base URL for the feedback API
-  static const String _baseUrl = 'http://localhost:5000/api/feedback';
+  // Use centralized deployed Render backend URL
+  static String get _baseUrl => '${AppConstants.baseApiUrl}/api/feedback';
 
   /// Submit feedback for a diagnosis.
   ///

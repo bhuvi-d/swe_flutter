@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:audioplayers/audioplayers.dart';
+import '../core/constants/app_constants.dart';
 
 /// Language configuration for Sarvam TTS + Translation
 class SarvamLanguage {
@@ -47,7 +48,8 @@ class TranslationResult {
 ///   1. [translate] → calls /api/tts/translate → returns native-script text
 ///   2. [speak]     → calls /api/tts/synthesize → plays WAV audio of that text
 class SarvamTTSService {
-  static const String _baseUrl = 'http://localhost:5000';
+  // Uses the deployed Render backend, NOT localhost (unreachable from phone)
+  static String get _baseUrl => AppConstants.baseApiUrl;
 
   static final AudioPlayer _player = AudioPlayer();
   static bool _isPlaying = false;
