@@ -55,9 +55,6 @@ dependencies:
   # Internationalization
   intl: ^0.20.2
 
-  # Utilities
-  cached_network_image: ^3.4.1
-  image: ^4.2.0
   # Geolocator
   geolocator: ^13.0.1
 
@@ -74,4 +71,3 @@ flutter:
     - assets/sounds/
     - assets/data/region_advice.json
     - assets/data/treatment_database.json
-    - assets/sounds/
