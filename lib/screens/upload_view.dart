@@ -6,10 +6,7 @@ import '../core/utils/responsive_layout.dart';
 import '../core/localization/translation_service.dart';
 import '../services/audio_service.dart';
 
-/// Upload View — Premium dark theme with responsive grid.
-///
-/// US12: Upload multiple images with thumbnail carousel.
-/// US16: Confirmation of uploaded/selected media.
+/// Upload View — Premium dark theme with single image scan effect.
 class UploadView extends StatefulWidget {
   final Function(List<String>) onImagesSelected;
   final VoidCallback onBack;
@@ -24,20 +21,42 @@ class UploadView extends StatefulWidget {
   State<UploadView> createState() => _UploadViewState();
 }
 
-class _UploadViewState extends State<UploadView> {
-  final List<XFile> _selectedImages = [];
-  final List<Uint8List> _imageBytes = [];
+class _UploadViewState extends State<UploadView> with SingleTickerProviderStateMixin {
+  XFile? _selectedImage;
+  Uint8List? _imageBytes;
   bool _isLoading = false;
+  late AnimationController _scanController;
 
-  Future<void> _selectImages() async {
+  static const Color _bgColor = Color(0xFF0F1A2E);
+  static const Color _cardBorderColor = Color(0xFF1F4D45); // Tealy border
+  static const Color _iconBgColor = Color(0xFF1F3D3C);
+  static const Color _iconColor = Color(0xFF27BA72);
+
+  @override
+  void initState() {
+    super.initState();
+    _scanController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+  }
+
+  @override
+  void dispose() {
+    _scanController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _selectImage() async {
+    if (_isLoading) return;
     try {
       final picker = ImagePicker();
-      final images = await picker.pickMultiImage(imageQuality: 85);
-      if (images.isNotEmpty) {
-        final bytes = await Future.wait(images.map((f) => f.readAsBytes()));
+      final image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+      if (image != null) {
+        final bytes = await image.readAsBytes();
         setState(() {
-          _selectedImages.addAll(images);
-          _imageBytes.addAll(bytes);
+          _selectedImage = image;
+          _imageBytes = bytes;
         });
         audioService.confirmAction('select');
       }
@@ -46,48 +65,60 @@ class _UploadViewState extends State<UploadView> {
     }
   }
 
-  void _removeImage(int index) {
+  void _removeImage() {
+    if (_isLoading) return;
     setState(() {
-      _selectedImages.removeAt(index);
-      _imageBytes.removeAt(index);
+      _selectedImage = null;
+      _imageBytes = null;
     });
     audioService.confirmAction('delete');
   }
 
-  Future<void> _uploadImages() async {
-    if (_selectedImages.isEmpty) return;
+  Future<void> _uploadImage() async {
+    if (_selectedImage == null) return;
     setState(() => _isLoading = true);
     audioService.confirmAction('success');
+    _scanController.repeat(reverse: true);
 
-    final paths = _selectedImages.map((f) => f.path).toList();
-    widget.onImagesSelected(paths);
+    widget.onImagesSelected([_selectedImage!.path]);
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${_selectedImages.length} image(s) sent for analysis'),
-          backgroundColor: const Color(0xFF10B981),
+        const SnackBar(
+          content: Text('Image sent for analysis'),
+          backgroundColor: Color(0xFF10B981),
         ),
       );
-      setState(() => _isLoading = false);
+      
+      // Stop animation matching typical transition time since parent handles state
+      Future.delayed(const Duration(seconds: 4), () {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _scanController.stop();
+          });
+        }
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F1A2E),
+      backgroundColor: _bgColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+          icon: const Icon(Icons.arrow_back_ios_new, size: 20, color: Colors.white70),
           onPressed: widget.onBack,
-          color: Colors.white70,
         ),
         title: Text(
-          context.t('uploadView.title'),
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          context.t('uploadView.title'), // "Upload Images" usually
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
         centerTitle: true,
       ),
@@ -106,18 +137,14 @@ class _UploadViewState extends State<UploadView> {
             children: [
               Expanded(
                 child: SingleChildScrollView(
-                  child: ResponsiveBody(
-                    child: Column(
-                      children: [
-                        const SizedBox(height: 8),
-                        // Drop Zone
-                        GestureDetector(
-                          onTap: _selectImages,
-                          child: _selectedImages.isEmpty
-                              ? _buildEmptyState()
-                              : _buildImageGrid(context),
-                        ),
-                      ],
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: responsiveMaxWidth(context)),
+                    child: GestureDetector(
+                      onTap: _selectedImage == null ? _selectImage : null,
+                      child: _selectedImage == null
+                          ? _buildEmptyState()
+                          : _buildImagePreview(context),
                     ),
                   ),
                 ),
@@ -133,12 +160,13 @@ class _UploadViewState extends State<UploadView> {
 
   Widget _buildEmptyState() {
     return Container(
-      height: 320,
+      height: 400,
+      width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
+        color: Colors.white.withOpacity(0.02),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: const Color(0xFF10B981).withOpacity(0.3),
+          color: _cardBorderColor,
           width: 2,
         ),
       ),
@@ -149,36 +177,36 @@ class _UploadViewState extends State<UploadView> {
             Container(
               width: 80,
               height: 80,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
+                color: _iconBgColor,
                 shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [
-                    const Color(0xFF10B981).withOpacity(0.2),
-                    const Color(0xFF10B981).withOpacity(0.05),
-                  ],
-                ),
               ),
               child: const Icon(
                 LucideIcons.imagePlus,
-                size: 36,
-                color: Color(0xFF10B981),
+                size: 34,
+                color: _iconColor,
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             const Text(
               'Tap to select images',
               style: TextStyle(
-                fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
+                fontSize: 22,
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Select one or more crop leaf images for analysis',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.white.withOpacity(0.5),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 30),
+              child: Text(
+                'Select one or more crop leaf images for analysis',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.5),
+                  fontSize: 15,
+                  height: 1.4,
+                ),
               ),
             ),
           ],
@@ -187,124 +215,99 @@ class _UploadViewState extends State<UploadView> {
     );
   }
 
-  Widget _buildImageGrid(BuildContext context) {
-    final cols = responsiveColumns(context, mobile: 2, tablet: 3, desktop: 4);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+  Widget _buildImagePreview(BuildContext context) {
+    return Container(
+      height: 400,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: _cardBorderColor, width: 2),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: Stack(
+          fit: StackFit.expand,
           children: [
-            Icon(LucideIcons.image, size: 18, color: const Color(0xFF10B981)),
-            const SizedBox(width: 8),
-            Text(
-              '${_selectedImages.length} image(s) selected',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
+            // Original captured image
+            Image.memory(
+              _imageBytes!,
+              fit: BoxFit.cover,
             ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: cols,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 1,
-          ),
-          itemCount: _selectedImages.length + 1, // +1 for add button
-          itemBuilder: (context, index) {
-            if (index == _selectedImages.length) {
-              // Add more button
-              return GestureDetector(
-                onTap: _selectImages,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.04),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withOpacity(0.1)),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(LucideIcons.plus, color: Colors.white.withOpacity(0.4), size: 28),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Add More',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.4),
-                          fontSize: 12,
+            
+            // Scanner Animation Overlay
+            if (_isLoading)
+              AnimatedBuilder(
+                animation: _scanController,
+                builder: (context, child) {
+                  return Positioned(
+                    top: _scanController.value * 400 - 50,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      height: 100,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            _iconColor.withOpacity(0.0),
+                            _iconColor.withOpacity(0.2),
+                            _iconColor.withOpacity(0.85),
+                          ],
+                          stops: const [0.0, 0.7, 1.0],
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              );
-            }
-
-            return Stack(
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withOpacity(0.1)),
-                    image: DecorationImage(
-                      image: MemoryImage(_imageBytes[index]),
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                ),
-                // Remove button
-                Positioned(
-                  top: 6,
-                  right: 6,
-                  child: GestureDetector(
-                    onTap: () => _removeImage(index),
-                    child: Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.6),
-                        shape: BoxShape.circle,
+                      child: Align(
+                        alignment: Alignment.bottomCenter,
+                        child: Container(
+                          height: 3,
+                          decoration: const BoxDecoration(
+                            color: _iconColor,
+                            boxShadow: [
+                              BoxShadow(
+                                color: _iconColor,
+                                blurRadius: 15,
+                                spreadRadius: 3,
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                      child: const Icon(Icons.close, size: 16, color: Colors.white),
                     ),
-                  ),
-                ),
-                // Index badge
-                Positioned(
-                  bottom: 6,
-                  left: 6,
+                  );
+                },
+              ),
+
+            // Remove button (hidden when scanning map)
+            if (!_isLoading)
+              Positioned(
+                top: 16,
+                right: 16,
+                child: GestureDetector(
+                  onTap: _removeImage,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    width: 38,
+                    height: 38,
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(8),
+                      color: Colors.black.withOpacity(0.55),
+                      shape: BoxShape.circle,
                     ),
-                    child: Text(
-                      '${index + 1}',
-                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                    ),
+                    child: const Icon(Icons.close, size: 20, color: Colors.white),
                   ),
                 ),
-              ],
-            );
-          },
+              ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
   Widget _buildBottomBar(BuildContext context) {
     return Container(
       padding: EdgeInsets.only(
-        left: 16, right: 16, top: 14,
-        bottom: MediaQuery.of(context).padding.bottom + 14,
+        left: 20, right: 20, top: 16,
+        bottom: MediaQuery.of(context).padding.bottom + 16,
       ),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.04),
@@ -315,38 +318,45 @@ class _UploadViewState extends State<UploadView> {
           constraints: BoxConstraints(maxWidth: responsiveMaxWidth(context)),
           child: Row(
             children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _isLoading ? null : _selectImages,
-                  icon: const Icon(LucideIcons.imagePlus, size: 18),
-                  label: Text(context.t('uploadView.addMore')),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    side: BorderSide(color: const Color(0xFF10B981).withOpacity(0.4)),
-                    foregroundColor: const Color(0xFF10B981),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
+              OutlinedButton.icon(
+                onPressed: _isLoading ? null : _selectImage,
+                icon: const Icon(LucideIcons.imagePlus, size: 20),
+                label: Text(
+                  context.t('uploadView.addMore'),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
+                  foregroundColor: _iconColor,
+                  side: const BorderSide(color: _cardBorderColor, width: 1.5),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
               ),
               const SizedBox(width: 14),
               Expanded(
-                flex: 2,
                 child: ElevatedButton.icon(
-                  onPressed: _selectedImages.isEmpty || _isLoading ? null : _uploadImages,
+                  onPressed: _selectedImage == null || _isLoading ? null : _uploadImage,
                   icon: _isLoading
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)
+                        )
                       : const Icon(LucideIcons.scan, size: 18),
                   label: Text(
-                    _selectedImages.isEmpty
+                    _selectedImage == null 
                         ? context.t('uploadView.selectImages')
-                        : '${context.t('uploadView.analyze')} ${_selectedImages.length}',
+                        : context.t('uploadView.analyze'),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF10B981),
+                    backgroundColor: const Color(0xFF233042),
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    disabledBackgroundColor: Colors.white.withOpacity(0.06),
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    disabledBackgroundColor: const Color(0xFF1F2B39),
+                    disabledForegroundColor: Colors.white.withOpacity(0.3),
                   ),
                 ),
               ),
